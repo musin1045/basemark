@@ -70,3 +70,35 @@ test("LocalStore rejects unsafe absolute or parent paths", async () => {
     /safe relative path/
   );
 });
+
+test("LocalStore lists stored documents under a relative directory", async () => {
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), "basemark-store-"));
+
+  try {
+    const store = new LocalStore({ rootDir: tempRoot });
+
+    await store.writeDocument("projects/project-2.json", { id: "project-2" });
+    await store.writeDocument("projects/project-1.json", { id: "project-1" });
+
+    const files = await store.listDocuments("projects");
+
+    assert.deepEqual(files, ["projects/project-1.json", "projects/project-2.json"]);
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test("LocalStore reads and writes raw text under a relative path", async () => {
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), "basemark-store-"));
+
+  try {
+    const store = new LocalStore({ rootDir: tempRoot });
+
+    await store.writeRawText("exports/sample/manifest.json", "{\"ok\":true}");
+    const raw = await store.readRawText("exports/sample/manifest.json");
+
+    assert.equal(raw, "{\"ok\":true}");
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});

@@ -5,7 +5,9 @@
   "type": "module",
   "description": "BaseMark local-first foundation",
   "scripts": {
-    "test": "node --test --test-isolation=none"
+    "test": "node --test --test-isolation=none",
+    "cli": "node src/cli/basemarkCli.js",
+    "app": "node src/server/basemarkServer.js"
   },
   "engines": {
     "node": ">=24"

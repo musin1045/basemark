@@ -1,0 +1,5 @@
+
+> basemark@0.1.0 app
+> node src/server/basemarkServer.js
+
+BaseMark local shell running at http://127.0.0.1:3000

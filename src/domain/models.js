@@ -19,6 +19,12 @@ function assertArray(value, fieldName) {
   }
 }
 
+function assertOptionalArray(value, fieldName) {
+  if (value !== undefined && value !== null && !Array.isArray(value)) {
+    throw new Error(`${fieldName} must be an array when provided.`);
+  }
+}
+
 function assertObject(value, fieldName) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new Error(`${fieldName} must be an object.`);
@@ -92,6 +98,18 @@ export function createCheckpoint(input) {
     spaceId: input.spaceId,
     label: input.label,
     mapPin: input.mapPin ?? null
+  };
+}
+
+export function createProjectCatalog(input) {
+  assertObject(input, "projectCatalog");
+  assertNonEmptyString(input.projectId, "projectCatalog.projectId");
+
+  return {
+    projectId: input.projectId,
+    units: (input.units ?? []).map(createUnit),
+    spaces: (input.spaces ?? []).map(createSpace),
+    checkpoints: (input.checkpoints ?? []).map(createCheckpoint)
   };
 }
 
@@ -189,6 +207,16 @@ export function createBackupManifest(input) {
   assertNonEmptyString(input.createdAt, "backupManifest.createdAt");
   assertNonEmptyString(input.schemaVersion, "backupManifest.schemaVersion");
   assertArray(input.files, "backupManifest.files");
+  assertOptionalArray(input.projectIds, "backupManifest.projectIds");
+  assertOptionalString(input.exportMode, "backupManifest.exportMode");
+
+  if (
+    input.fileCount !== undefined &&
+    input.fileCount !== null &&
+    !Number.isInteger(input.fileCount)
+  ) {
+    throw new Error("backupManifest.fileCount must be an integer when provided.");
+  }
 
   for (const file of input.files) {
     assertObject(file, "backupManifest.files[]");
@@ -200,6 +228,12 @@ export function createBackupManifest(input) {
     id: input.id,
     createdAt: input.createdAt,
     schemaVersion: input.schemaVersion,
+    projectIds: (input.projectIds ?? []).map((projectId) => {
+      assertNonEmptyString(projectId, "backupManifest.projectIds[]");
+      return projectId;
+    }),
+    fileCount: input.fileCount ?? input.files.length,
+    exportMode: input.exportMode ?? null,
     files: input.files.map((file) => ({
       path: file.path,
       sha256: file.sha256

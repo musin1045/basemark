@@ -19,6 +19,9 @@
 - Data model implementation: minimal V1 entity contracts present
 - Build/runtime stack: Node 24 ESM
 - Local persistence approach: filesystem-backed JSON documents with schema version guard
+- Local app entrypoints:
+  - JSON-input CLI for workspace and inspection record operations
+  - dependency-free local web shell over HTTP for interactive V1 flow
 
 ## BaseMark Intent Alignment
 - Local-first: aligned in docs, not implemented
@@ -26,7 +29,8 @@
 - Frozen baseline preservation: baseline version and snapshot required in inspection records
 - `extra` without checkpoint linkage: supported in inspection item contract
 - Backup/version integrity: schema version guard started, import/export not implemented
-- Report generation: not implemented
+- Backup/version integrity: manual folder-based export/import implemented with manifest and import-as-new restore policy
+- Report generation: local Markdown report generation implemented for finalized records
 - Drawing/background map workflow: not implemented
 
 ## Architecture Guards
@@ -38,23 +42,21 @@
 - Keep local persistence on stable relative file references.
 
 ## Active Bounded Step
-- Step: define the BaseMark V1 core local data model
-- Why now: the storage layer exists, so the next safe step is to freeze core entity meaning before adding app workflow or persistence adapters
+- Step: deepen the V1 report and operator shell flow
+- Why now: backup and local report generation now exist, so the next safe step is to make the report slice more usable and visible in the local shell
 - Out of scope:
   - database migrations
-  - backup/export logic
-  - report generation
   - drawing/map UI
   - full application UI
 
 ## Risks / Open Questions
-- No app shell or user-facing workflow exists yet.
-- Backup manifest exists only as a contract, not as an export/import implementation.
-- Inspection entities are validated in memory, but not yet persisted as BaseMark-specific documents.
+- The interactive shell is currently a thin browser-based operator shell, not a production mobile or desktop app.
+- Report generation currently emits Markdown summaries, not PDF output.
+- Backup restore uses import-as-new on project conflict; overwrite and merge modes are still intentionally absent.
 
 ## Next Smallest Step
-- Add BaseMark document repositories on top of the local store:
-  - project document read/write
-  - inspection record read/write
-  - backup manifest read/write
-  - tests for stable relative file layout
+- Deepen the report slice:
+  - add report list and detail visibility in the web shell
+  - improve report content formatting and summary structure
+  - decide whether V1 stops at Markdown or adds a PDF conversion step
+  - include generated reports consistently in backup/restore verification

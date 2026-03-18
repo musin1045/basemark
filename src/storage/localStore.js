@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { SCHEMA_VERSION } from "../core/schema.js";
@@ -45,5 +45,35 @@ export class LocalStore {
     }
 
     return document;
+  }
+
+  async readRawText(fileName) {
+    const sourcePath = this.resolvePath(fileName);
+    return readFile(sourcePath, "utf8");
+  }
+
+  async writeRawText(fileName, content) {
+    const targetPath = this.resolvePath(fileName);
+    await mkdir(path.dirname(targetPath), { recursive: true });
+    await writeFile(targetPath, content, "utf8");
+    return targetPath;
+  }
+
+  async listDocuments(directoryName) {
+    const sourcePath = this.resolvePath(directoryName);
+    const entries = await readdir(sourcePath, { withFileTypes: true }).catch(
+      (error) => {
+        if (error.code === "ENOENT") {
+          return [];
+        }
+
+        throw error;
+      }
+    );
+
+    return entries
+      .filter((entry) => entry.isFile())
+      .map((entry) => path.posix.join(directoryName, entry.name))
+      .sort();
   }
 }

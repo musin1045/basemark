@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>BaseMark V1 Local Shell</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="hero">
+        <p class="eyebrow">BaseMark V1</p>
+        <h1>Inspection Dashboard</h1>
+        <p class="lede">프로젝트 선택, 워크스페이스 확인, inspection 기록, 보고서 생성과 복원을 한 화면에서 이어서 처리하는 로컬 작업 셸입니다.</p>
+      </header>
+
+      <section class="dashboard-grid">
+        <section class="panel hero-summary">
+          <div class="panel-header">
+            <h2>Current Run</h2>
+            <button data-action="load-selection">Refresh</button>
+          </div>
+          <div class="metrics-grid">
+            <article class="metric-card">
+              <span class="metric-label">Project</span>
+              <strong id="selected-project-name">None</strong>
+              <span id="selected-project-id" class="metric-meta">-</span>
+            </article>
+            <article class="metric-card">
+              <span class="metric-label">Record</span>
+              <strong id="selected-record-name">None</strong>
+              <span id="selected-record-id" class="metric-meta">-</span>
+            </article>
+            <article class="metric-card">
+              <span class="metric-label">Status</span>
+              <strong id="dashboard-record-status">No record</strong>
+              <span id="dashboard-item-count" class="metric-meta">Items 0</span>
+            </article>
+            <article class="metric-card">
+              <span class="metric-label">Artifacts</span>
+              <strong id="dashboard-report-count">Reports 0</strong>
+              <span id="dashboard-backup-count" class="metric-meta">Backups 0</span>
+            </article>
+          </div>
+          <div id="next-actions" class="callout-strip">
+            <p>Select or create a workspace to begin.</p>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <h2>Selection Details</h2>
+            <button data-action="workspace-show">Workspace</button>
+          </div>
+          <dl class="selection-grid">
+            <div>
+              <dt>Project</dt>
+              <dd id="selection-project-detail">None</dd>
+            </div>
+            <div>
+              <dt>Record</dt>
+              <dd id="selection-record-detail">None</dd>
+            </div>
+            <div>
+              <dt>Project Scope</dt>
+              <dd id="selection-project-scope">-</dd>
+            </div>
+            <div>
+              <dt>Record State</dt>
+              <dd id="selection-record-state">-</dd>
+            </div>
+          </dl>
+        </section>
+      </section>
+
+      <section class="lane-grid">
+        <section class="panel list-panel">
+          <div class="panel-header">
+            <h2>Projects</h2>
+            <button data-action="list-projects">Refresh</button>
+          </div>
+          <p class="panel-copy">저장된 프로젝트를 보고 현재 작업 대상을 선택합니다.</p>
+          <div id="projects-list" class="list-stack"></div>
+        </section>
+
+        <section class="panel list-panel">
+          <div class="panel-header">
+            <h2>Records</h2>
+            <button data-action="list-records">Refresh</button>
+          </div>
+          <p class="panel-copy">선택한 프로젝트의 inspection record를 확인합니다.</p>
+          <div id="records-list" class="list-stack"></div>
+        </section>
+
+        <section class="panel task-panel">
+          <div class="panel-header">
+            <h2>Next Actions</h2>
+            <button data-action="record-show">Record</button>
+          </div>
+          <div id="action-lane" class="summary-stack">
+            <p>No action context yet.</p>
+          </div>
+          <div class="actions">
+            <button data-action="record-review">Send Review</button>
+            <button data-action="record-finalize">Finalize</button>
+            <button data-action="report-generate">Generate Report</button>
+            <button data-action="backup-export">Export Backup</button>
+          </div>
+        </section>
+      </section>
+
+      <section class="workspace-grid">
+        <section class="panel summary-panel">
+          <div class="panel-header">
+            <h2>Workspace Summary</h2>
+            <button data-action="workspace-show">Show</button>
+          </div>
+          <div id="workspace-summary" class="summary-stack">
+            <p>No workspace loaded.</p>
+          </div>
+        </section>
+
+        <section class="panel summary-panel">
+          <div class="panel-header">
+            <h2>Record Summary</h2>
+            <button data-action="record-show">Show</button>
+          </div>
+          <div id="record-summary" class="summary-stack">
+            <p>No record loaded.</p>
+          </div>
+        </section>
+
+        <section class="panel summary-panel">
+          <div class="panel-header">
+            <h2>Backups</h2>
+            <button data-action="backup-list">List</button>
+          </div>
+          <div class="actions backup-actions">
+            <button data-action="backup-export">Export Project</button>
+            <button data-action="backup-show">Show Selected</button>
+            <button data-action="backup-restore">Restore Selected</button>
+          </div>
+          <label for="backup-id">Backup ID</label>
+          <input id="backup-id" type="text" value="">
+          <div id="backup-summary" class="summary-stack">
+            <p>No backup selected.</p>
+          </div>
+        </section>
+
+        <section class="panel summary-panel report-panel report-focus-panel">
+          <div class="panel-header">
+            <h2>Reports</h2>
+            <button data-action="report-list">List</button>
+          </div>
+          <div class="actions backup-actions">
+            <button data-action="report-generate">Generate</button>
+            <button data-action="report-show">Show Selected</button>
+          </div>
+          <label for="report-id">Report ID</label>
+          <input id="report-id" type="text" value="">
+          <div id="reports-list" class="list-stack compact-list"></div>
+          <div id="report-summary" class="summary-stack">
+            <p>No report selected.</p>
+          </div>
+          <div id="report-preview" class="report-preview">No report preview loaded.</div>
+        </section>
+      </section>
+
+      <section class="panel-grid">
+        <section class="panel">
+          <h2>Workspace Setup</h2>
+          <div class="form-grid">
+            <label>Project ID<input id="project-id-input" type="text" value="project-1"></label>
+            <label>Project Name<input id="project-name-input" type="text" value="Tower A"></label>
+            <label>Site Name<input id="site-name-input" type="text" value="Seoul"></label>
+            <label>Baseline Unit<input id="baseline-unit-input" type="text" value="101"></label>
+            <label>Comparison Unit<input id="comparison-unit-input" type="text" value="102"></label>
+            <label>Space Name<input id="space-name-input" type="text" value="Living Room"></label>
+            <label>Checkpoint Label<input id="checkpoint-label-input" type="text" value="Window A"></label>
+          </div>
+          <button data-action="workspace-init-form">Create Workspace</button>
+        </section>
+
+        <section class="panel">
+          <h2>Record Start</h2>
+          <div class="form-grid">
+            <label>Record ID<input id="record-start-id" type="text" value="record-1"></label>
+            <label>Project ID<input id="record-project-id" type="text" value="project-1"></label>
+            <label>Baseline Unit ID<input id="record-baseline-id" type="text" value="unit-baseline"></label>
+            <label>Comparison Unit ID<input id="record-comparison-id" type="text" value="unit-comparison"></label>
+            <label>Baseline Version<input id="baseline-version-input" type="text" value="baseline-v1"></label>
+          </div>
+          <button data-action="record-start-form">Start Record</button>
+        </section>
+
+        <section class="panel">
+          <h2>Add Item</h2>
+          <div class="form-grid">
+            <label>Record ID<input id="item-record-id" type="text" value="record-1"></label>
+            <label>Item ID<input id="item-id-input" type="text" value="item-1"></label>
+            <label>Checkpoint ID<input id="item-checkpoint-id" type="text" value="cp-1"></label>
+            <label>Space ID<input id="item-space-id" type="text" value="space-1"></label>
+            <label>Result Type
+              <select id="item-result-type">
+                <option value="missing">missing</option>
+                <option value="extra">extra</option>
+                <option value="position_diff">position_diff</option>
+              </select>
+            </label>
+            <label>Review Required
+              <select id="item-review-required">
+                <option value="true">true</option>
+                <option value="false">false</option>
+              </select>
+            </label>
+          </div>
+          <label class="stacked-label">Note<textarea id="item-note-input" spellcheck="false"></textarea></label>
+          <button data-action="record-add-item-form">Add Item</button>
+        </section>
+
+        <section class="panel status-panel">
+          <h2>Record Actions</h2>
+          <label for="record-id">Record ID</label>
+          <input id="record-id" type="text" value="record-1">
+          <label for="list-project-id">Project ID</label>
+          <input id="list-project-id" type="text" value="project-1">
+          <div class="actions">
+            <button data-action="record-review">Send Review</button>
+            <button data-action="record-reopen">Reopen</button>
+            <button data-action="record-finalize">Finalize</button>
+            <button data-action="record-show">Show</button>
+          </div>
+        </section>
+      </section>
+
+      <section class="panel-grid editor-grid">
+        <section class="panel">
+          <h2>Workspace JSON</h2>
+          <textarea id="workspace-input" spellcheck="false"></textarea>
+          <button data-action="workspace-init">Send Raw JSON</button>
+        </section>
+        <section class="panel">
+          <h2>Record JSON</h2>
+          <textarea id="record-start-input" spellcheck="false"></textarea>
+          <button data-action="record-start">Send Raw JSON</button>
+        </section>
+        <section class="panel">
+          <h2>Item JSON</h2>
+          <textarea id="item-input" spellcheck="false"></textarea>
+          <button data-action="record-add-item">Send Raw JSON</button>
+        </section>
+      </section>
+
+      <section class="output-panel">
+        <div class="output-header">
+          <h2>Output</h2>
+          <button data-action="clear-output">Clear</button>
+        </div>
+        <pre id="output"></pre>
+      </section>
+    </main>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

@@ -7,7 +7,8 @@ import {
   createBackupManifest,
   createBaseMarkModel,
   createInspectionItem,
-  createInspectionRecord
+  createInspectionRecord,
+  createProjectCatalog
 } from "../src/domain/models.js";
 
 test("BaseMark model exposes frozen MVP statuses and result types", () => {
@@ -83,6 +84,9 @@ test("Backup manifest keeps stable relative file references", () => {
     id: "backup-1",
     createdAt: "2026-03-18T00:00:00.000Z",
     schemaVersion: "1",
+    projectIds: ["project-1"],
+    fileCount: 1,
+    exportMode: "manual_folder",
     files: [
       {
         path: "records/record-1.json",
@@ -92,6 +96,42 @@ test("Backup manifest keeps stable relative file references", () => {
   });
 
   assert.equal(manifest.files[0].path, "records/record-1.json");
+  assert.equal(manifest.projectIds[0], "project-1");
+  assert.equal(manifest.fileCount, 1);
+  assert.equal(manifest.exportMode, "manual_folder");
+});
+
+test("Project catalog keeps project-scoped unit, space, and checkpoint data", () => {
+  const catalog = createProjectCatalog({
+    projectId: "project-1",
+    units: [
+      {
+        id: "unit-baseline",
+        projectId: "project-1",
+        name: "101",
+        kind: "baseline"
+      }
+    ],
+    spaces: [
+      {
+        id: "space-1",
+        unitId: "unit-baseline",
+        name: "Living Room"
+      }
+    ],
+    checkpoints: [
+      {
+        id: "cp-1",
+        unitId: "unit-baseline",
+        spaceId: "space-1",
+        label: "Window A"
+      }
+    ]
+  });
+
+  assert.equal(catalog.projectId, "project-1");
+  assert.equal(catalog.units[0].kind, "baseline");
+  assert.equal(catalog.checkpoints[0].spaceId, "space-1");
 });
 
 test("Full BaseMark model assembles the minimal V1 entities", () => {
@@ -147,7 +187,7 @@ test("Full BaseMark model assembles the minimal V1 entities", () => {
       {
         id: "report-1",
         recordId: "record-1",
-        fileName: "record-1.pdf"
+        fileName: "report-files/report-1.md"
       }
     ],
     backupManifest: {
