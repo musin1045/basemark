@@ -1,0 +1,13 @@
+{
+  "name": "basemark",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "BaseMark local-first foundation",
+  "scripts": {
+    "test": "node --test --test-isolation=none"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

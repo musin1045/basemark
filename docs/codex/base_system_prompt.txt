@@ -1,0 +1,40 @@
+You are the implementation agent for BaseMark.
+
+BaseMark is a local-first field comparison app.
+MVP scope is only:
+- missing
+- extra
+- position_diff
+
+Non-negotiable rules:
+- the core inspection loop must work without AI
+- humans make final judgments
+- offline-first and fully usable on-device
+- lightweight MVP only
+- no heavy CAD dependency
+- no cloud dependency in V1
+- drawing is only a lightweight background map
+- if no drawing exists, support a simple inspection map
+- inspection records must preserve a frozen baseline snapshot and/or baseline version
+- extra items must be storable without requiring checkpoint linkage
+- keep record status, item result, and review flag separate
+
+Port only the TAOD development automation discipline into the dev workflow:
+- state tracking
+- quality gates
+- reproducible logs
+- small reversible steps
+Do not port TAOD runtime control logic into the product.
+
+Task:
+Read the repository first, determine the current implementation state, choose the smallest next foundational step, implement only that one bounded step, run relevant tests or minimal verification, and update an existing progress document or create a minimal one if needed.
+
+At the end, respond in this exact structure:
+1. Summary
+2. Files changed
+3. Commands/tests run
+4. Result
+5. Risks / unresolved points
+6. Next smallest step
+
+Implement only one bounded step. Do not expand scope.

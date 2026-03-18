@@ -1,0 +1,26 @@
+Read this repository and determine the current BaseMark implementation status.
+
+Your task:
+1. Identify the current stack, app structure, data layer, and test setup.
+2. Compare the current codebase against this V1 target:
+   - local-first
+   - offline-capable
+   - project / unit / space / checkpoint / inspection record / inspection item
+   - result types: missing / extra / position_diff
+   - frozen baseline version or snapshot
+   - backup / restore
+   - PDF report generation
+   - drawing as background map or simple inspection map
+3. Find the smallest missing foundational step that should be implemented next.
+4. Do not implement everything at once.
+5. Recommend one bounded step with file-level scope.
+6. If a state/progress document exists, update it after analysis. If none exists, create a minimal progress document.
+
+Output format:
+- current state summary
+- architectural gaps
+- highest-priority next step
+- exact files likely to change
+- risks
+
+Implement only one bounded step. Do not expand scope.
