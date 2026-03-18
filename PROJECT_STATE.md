@@ -9,22 +9,22 @@
 ## Current Repository State
 - Date: 2026-03-18
 - Branch: `master`
-- Commit state: no commits yet
+- Commit state: initial local-first foundation committed
 - App code: minimal Node foundation present
 - Docs present:
   - `docs/codex/base_system_prompt.txt`
   - `docs/codex/first_repo_analysis_prompt.txt`
   - `docs/codex/progress_template.md`
 - Test setup: Node built-in test runner via `node --test --test-isolation=none`
-- Data model implementation: not present
+- Data model implementation: minimal V1 entity contracts present
 - Build/runtime stack: Node 24 ESM
 - Local persistence approach: filesystem-backed JSON documents with schema version guard
 
 ## BaseMark Intent Alignment
 - Local-first: aligned in docs, not implemented
 - Offline-capable core loop: not implemented
-- Frozen baseline preservation: not implemented
-- `extra` without checkpoint linkage: not implemented
+- Frozen baseline preservation: baseline version and snapshot required in inspection records
+- `extra` without checkpoint linkage: supported in inspection item contract
 - Backup/version integrity: schema version guard started, import/export not implemented
 - Report generation: not implemented
 - Drawing/background map workflow: not implemented
@@ -38,27 +38,23 @@
 - Keep local persistence on stable relative file references.
 
 ## Active Bounded Step
-- Step: establish the minimal runnable local-first foundation
-- Why now: the repository needs a concrete runtime, local persistence direction, and verification command before domain modeling can start
+- Step: define the BaseMark V1 core local data model
+- Why now: the storage layer exists, so the next safe step is to freeze core entity meaning before adding app workflow or persistence adapters
 - Out of scope:
-  - database schema
+  - database migrations
   - backup/export logic
   - report generation
   - drawing/map UI
   - full application UI
 
 ## Risks / Open Questions
-- The current foundation is filesystem-based and does not yet define domain entities.
 - No app shell or user-facing workflow exists yet.
-- Backup manifest and frozen baseline logic are still undefined above the storage layer.
+- Backup manifest exists only as a contract, not as an export/import implementation.
+- Inspection entities are validated in memory, but not yet persisted as BaseMark-specific documents.
 
 ## Next Smallest Step
-- Define the BaseMark V1 core local data model on top of the storage layer:
-  - `Project`
-  - `Unit`
-  - `Space`
-  - `Checkpoint`
-  - `InspectionRecord`
-  - `InspectionItem`
-  - `Report`
-  - `BackupManifest`
+- Add BaseMark document repositories on top of the local store:
+  - project document read/write
+  - inspection record read/write
+  - backup manifest read/write
+  - tests for stable relative file layout
