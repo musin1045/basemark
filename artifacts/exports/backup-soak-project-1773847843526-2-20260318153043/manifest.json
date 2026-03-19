@@ -1,0 +1,32 @@
+{
+  "id": "backup-soak-project-1773847843526-2-20260318153043",
+  "createdAt": "2026-03-18T15:30:43.566Z",
+  "schemaVersion": "1",
+  "projectIds": [
+    "soak-project-1773847843526-2"
+  ],
+  "fileCount": 5,
+  "exportMode": "manual_folder",
+  "files": [
+    {
+      "path": "projects/soak-project-1773847843526-2.json",
+      "sha256": "fc20e70b08a034ba92c171abc4a648bfe17865bdae3333ccaccb4540d15bf328"
+    },
+    {
+      "path": "projects/soak-project-1773847843526-2.catalog.json",
+      "sha256": "1f1789c3305e07880c258f28d3bffda79f5b419e07396ee04abcaf38666255b4"
+    },
+    {
+      "path": "records/soak-record-1773847843526-2.json",
+      "sha256": "0193fac4b102442e21d79767c088bb8d38796c604eab543b9369585ccf5ae187"
+    },
+    {
+      "path": "reports/report-soak-record-1773847843526-2.json",
+      "sha256": "481ce61f5f3bf4f0a042f35058318f77435dbe13f59423e8132bb11e482ad80d"
+    },
+    {
+      "path": "report-files/report-soak-record-1773847843526-2.md",
+      "sha256": "bc512ee3373c3323dac55f02ec076dc510bbda2ae8519c0e51e7cdf43bc0dfec"
+    }
+  ]
+}

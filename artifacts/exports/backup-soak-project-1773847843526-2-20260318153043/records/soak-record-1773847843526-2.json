@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "savedAt": "2026-03-18T15:30:43.551Z-d75d63c2-a659-4cbe-9646-995805ff2503",
+  "payload": {
+    "id": "soak-record-1773847843526-2",
+    "projectId": "soak-project-1773847843526-2",
+    "baselineUnitId": "unit-baseline",
+    "comparisonUnitId": "unit-comparison",
+    "status": "finalized",
+    "baselineVersion": "baseline-v1",
+    "baselineSnapshot": {
+      "unitId": "unit-baseline",
+      "unitName": "101",
+      "spaces": [
+        {
+          "id": "space-1",
+          "name": "Living Room",
+          "label": null
+        }
+      ],
+      "checkpoints": [
+        {
+          "id": "cp-1",
+          "spaceId": "space-1",
+          "label": "Window A",
+          "mapPin": null
+        }
+      ]
+    },
+    "reviewRequired": true,
+    "items": [
+      {
+        "id": "soak-item-1773847843526-2",
+        "recordId": "soak-record-1773847843526-2",
+        "checkpointId": "cp-1",
+        "spaceId": null,
+        "resultType": "missing",
+        "reviewRequired": true,
+        "note": "Soak finding 2"
+      }
+    ]
+  }
+}

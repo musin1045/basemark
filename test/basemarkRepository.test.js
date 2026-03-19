@@ -77,6 +77,37 @@ test("BaseMarkRepository persists inspection records under records/", async () =
   }
 });
 
+test("BaseMarkRepository exposes inspection record envelopes for optimistic writes", async () => {
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), "basemark-repo-"));
+
+  try {
+    const repository = new BaseMarkRepository({
+      store: new LocalStore({ rootDir: tempRoot })
+    });
+
+    await repository.saveInspectionRecord({
+      id: "record-1",
+      projectId: "project-1",
+      baselineUnitId: "unit-baseline",
+      comparisonUnitId: "unit-comparison",
+      status: "draft",
+      baselineVersion: "baseline-v1",
+      baselineSnapshot: {
+        unitId: "unit-baseline",
+        checkpoints: [{ id: "cp-1", label: "Window A" }]
+      },
+      items: []
+    });
+
+    const envelope = await repository.readInspectionRecordEnvelope("record-1");
+
+    assert.equal(typeof envelope.savedAt, "string");
+    assert.equal(envelope.record.id, "record-1");
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
 test("BaseMarkRepository persists project catalogs beside project documents", async () => {
   const tempRoot = await mkdtemp(path.join(os.tmpdir(), "basemark-repo-"));
 

@@ -7,9 +7,18 @@
   "scripts": {
     "test": "node --test --test-isolation=none",
     "cli": "node src/cli/basemarkCli.js",
-    "app": "node src/server/basemarkServer.js"
+    "app": "node src/server/basemarkServer.js",
+    "soak": "node scripts/soak_local_app.mjs",
+    "android:sync": "npx cap sync android",
+    "android:run": "npx cap run android"
   },
   "engines": {
     "node": ">=24"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.2.0",
+    "@capacitor/cli": "^8.2.0",
+    "@capacitor/core": "^8.2.0",
+    "konva": "^10.2.3"
   }
 }

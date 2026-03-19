@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, unlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -421,5 +421,145 @@ test("BaseMarkService generates a markdown report from a finalized inspection re
   } finally {
     await rm(tempRoot, { recursive: true, force: true });
     await rm(exportRoot, { recursive: true, force: true });
+  }
+});
+
+test("BaseMarkService cleans up temp backup output when export fails", async () => {
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), "basemark-service-"));
+  const exportRoot = path.join(tempRoot, "..", `${path.basename(tempRoot)}-exports`);
+
+  try {
+    const service = createService(tempRoot);
+    await seedWorkspace(service);
+    await service.startInspectionRecord({
+      id: "record-8",
+      projectId: "project-1",
+      baselineUnitId: "unit-baseline",
+      comparisonUnitId: "unit-comparison",
+      baselineVersion: "baseline-v1"
+    });
+    await service.sendInspectionRecordToReview("record-8");
+    await service.finalizeInspectionRecord("record-8");
+    const generated = await service.generateInspectionReport("record-8");
+    await unlink(path.join(tempRoot, generated.report.fileName));
+
+    await assert.rejects(
+      () => service.exportProjectBackup("project-1"),
+      /ENOENT/
+    );
+
+    const exportEntries = await service.listBackupPackages();
+    assert.equal(exportEntries.length, 0);
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+    await rm(exportRoot, { recursive: true, force: true });
+  }
+});
+
+test("BaseMarkService rejects restore when backup file checksum does not match", async () => {
+  const sourceRoot = await mkdtemp(path.join(os.tmpdir(), "basemark-service-src-"));
+  const targetRoot = await mkdtemp(path.join(os.tmpdir(), "basemark-service-dst-"));
+  const exportRoot = path.join(os.tmpdir(), `basemark-shared-export-${Date.now()}-checksum`);
+
+  try {
+    const sourceService = new BaseMarkService({
+      repository: new BaseMarkRepository({
+        store: new LocalStore({ rootDir: sourceRoot })
+      }),
+      exportDir: exportRoot
+    });
+    const targetService = new BaseMarkService({
+      repository: new BaseMarkRepository({
+        store: new LocalStore({ rootDir: targetRoot })
+      }),
+      exportDir: exportRoot
+    });
+
+    await seedWorkspace(sourceService);
+    const backup = await sourceService.exportProjectBackup("project-1");
+    await writeFile(
+      path.join(exportRoot, backup.backupId, "projects", "project-1.json"),
+      '{"tampered":true}',
+      "utf8"
+    );
+
+    await assert.rejects(
+      () => targetService.restoreBackupPackage(backup.backupId),
+      /checksum mismatch/
+    );
+  } finally {
+    await rm(sourceRoot, { recursive: true, force: true });
+    await rm(targetRoot, { recursive: true, force: true });
+    await rm(exportRoot, { recursive: true, force: true });
+  }
+});
+
+test("BaseMarkService detects stale record writes during append and status transition", async () => {
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), "basemark-service-"));
+
+  try {
+    const service = createService(tempRoot);
+    await seedWorkspace(service);
+    await service.startInspectionRecord({
+      id: "record-9",
+      projectId: "project-1",
+      baselineUnitId: "unit-baseline",
+      comparisonUnitId: "unit-comparison",
+      baselineVersion: "baseline-v1"
+    });
+
+    const staleEnvelope = await service.repository.readInspectionRecordEnvelope("record-9");
+    await service.repository.saveInspectionRecord(
+      {
+        ...staleEnvelope.record,
+        items: [
+          {
+            id: "item-fresh",
+            recordId: "record-9",
+            checkpointId: "cp-1",
+            resultType: "missing",
+            reviewRequired: false
+          }
+        ]
+      },
+      { expectedSavedAt: staleEnvelope.savedAt }
+    );
+
+    await assert.rejects(
+      () =>
+        service.repository.saveInspectionRecord(
+          {
+            ...staleEnvelope.record,
+            items: [
+              {
+                id: "item-stale",
+                recordId: "record-9",
+                checkpointId: "cp-1",
+                resultType: "missing",
+                reviewRequired: false
+              }
+            ]
+          },
+          { expectedSavedAt: staleEnvelope.savedAt }
+        ),
+      /Concurrent modification detected/
+    );
+
+    const staleForStatus = await service.repository.readInspectionRecordEnvelope("record-9");
+    await service.sendInspectionRecordToReview("record-9");
+
+    await assert.rejects(
+      () =>
+        service.repository.saveInspectionRecord(
+          {
+            ...staleForStatus.record,
+            status: "finalized"
+          },
+          { expectedSavedAt: staleForStatus.savedAt }
+        ),
+      /Concurrent modification detected/
+    );
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
   }
 });

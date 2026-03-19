@@ -1,5 +1,6 @@
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 
 import { SCHEMA_VERSION } from "../core/schema.js";
 
@@ -19,13 +20,29 @@ export class LocalStore {
     return path.join(this.rootDir, fileName);
   }
 
-  async writeDocument(fileName, payload) {
+  async writeDocument(fileName, payload, options = {}) {
     const targetPath = this.resolvePath(fileName);
     await mkdir(path.dirname(targetPath), { recursive: true });
 
+    if (options.expectedSavedAt !== undefined) {
+      const current = await this.readDocument(fileName).catch((error) => {
+        if (error.code === "ENOENT") {
+          return null;
+        }
+
+        throw error;
+      });
+
+      if (!current || current.savedAt !== options.expectedSavedAt) {
+        throw new Error(
+          `Concurrent modification detected for ${fileName}.`
+        );
+      }
+    }
+
     const document = {
       schemaVersion: SCHEMA_VERSION,
-      savedAt: new Date().toISOString(),
+      savedAt: `${new Date().toISOString()}-${randomUUID()}`,
       payload
     };
 

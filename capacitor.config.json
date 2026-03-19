@@ -1,0 +1,6 @@
+{
+  "appId": "com.basemark.app",
+  "appName": "BaseMark",
+  "webDir": "src/ui",
+  "bundledWebRuntime": false
+}

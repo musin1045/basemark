@@ -31,11 +31,19 @@ test("Local server serves the V1 shell page", async () => {
       const html = await response.text();
       const appJsResponse = await fetch(`${baseUrl}/app.js`);
       const appJs = await appJsResponse.text();
+      const engineModuleResponse = await fetch(`${baseUrl}/engine/baseMarkEngine.js`);
+      const engineModule = await engineModuleResponse.text();
+      const konvaResponse = await fetch(`${baseUrl}/vendor/konva.min.js`);
+      const konvaJs = await konvaResponse.text();
 
       assert.equal(response.status, 200);
       assert.match(html, /BaseMark V1 Local App/);
       assert.equal(appJsResponse.status, 200);
       assert.match(appJs, /runEngine/);
+      assert.equal(engineModuleResponse.status, 200);
+      assert.match(engineModule, /generateComparisonCandidates/);
+      assert.equal(konvaResponse.status, 200);
+      assert.match(konvaJs, /Konva/);
     } finally {
       await new Promise((resolve) => server.close(resolve));
     }
@@ -235,6 +243,91 @@ test("Local server runs the workspace and record flow through HTTP routes", asyn
         })
       });
       const engineResult = await engineResponse.json();
+      const saveScenarioResponse = await fetch(`${baseUrl}/api/engine/scenario/save`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          id: "door-left-wall",
+          name: "Door Left Wall",
+          description: "Editable engine scenario",
+          scenario: {
+            segment: {
+              segmentId: "segment-door-left-wall",
+              segmentKind: "wall_strip",
+              label: "Door-left wall segment"
+            },
+            anchors: [
+              {
+                anchorId: "anchor-left",
+                segmentId: "segment-door-left-wall",
+                anchorKind: "door_frame_edge",
+                geometryType: "point",
+                drawingReference: { point: { x: 0, y: 0 } },
+                fieldObservation: { point: { x: 100, y: 120 } },
+                stabilityScore: 0.96,
+                visibilityState: "visible"
+              },
+              {
+                anchorId: "anchor-right",
+                segmentId: "segment-door-left-wall",
+                anchorKind: "wall_corner",
+                geometryType: "point",
+                drawingReference: { point: { x: 1, y: 0 } },
+                fieldObservation: { point: { x: 300, y: 120 } },
+                stabilityScore: 0.92,
+                visibilityState: "visible"
+              }
+            ],
+            checkpoints: [
+              {
+                checkpointId: "checkpoint-switch",
+                segmentId: "segment-door-left-wall",
+                anchorBasis: ["anchor-left", "anchor-right"],
+                coordinateModel: "span_ratio_plus_height_ratio",
+                normalizedPosition: {
+                  spanRatio: 0.5,
+                  heightRatio: -0.1
+                },
+                allowedTolerance: {
+                  positionSpanRatio: 0.05,
+                  searchSpanRatio: 0.2
+                },
+                semanticExpectation: "switch_box"
+              }
+            ],
+            fieldEvidence: {
+              evidenceId: "evidence-1",
+              segmentId: "segment-door-left-wall",
+              imageRef: "fixtures/door-left-wall.jpg"
+            },
+            observedElements: []
+          }
+        })
+      });
+      const savedScenario = await saveScenarioResponse.json();
+      const scenarioListResponse = await fetch(`${baseUrl}/api/engine/scenarios`);
+      const scenarioList = await scenarioListResponse.json();
+      const scenarioShowResponse = await fetch(
+        `${baseUrl}/api/engine/scenario/show?scenarioId=door-left-wall`
+      );
+      const scenarioShow = await scenarioShowResponse.json();
+      const reviewShowResponse = await fetch(
+        `${baseUrl}/api/engine/review/show?scenarioId=door-left-wall`
+      );
+      const initialReview = await reviewShowResponse.json();
+      const reviewSaveResponse = await fetch(`${baseUrl}/api/engine/review/save`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          scenarioId: "door-left-wall",
+          review: {
+            candidateId: "candidate-checkpoint-switch-missing",
+            status: "confirm",
+            note: "Looks valid"
+          }
+        })
+      });
+      const savedReview = await reviewSaveResponse.json();
 
       assert.equal(workspace.project.id, "project-1");
       assert.equal(projects.length, 1);
@@ -253,6 +346,13 @@ test("Local server runs the workspace and record flow through HTTP routes", asyn
       assert.equal(backupDetails.manifest.id, exportedBackup.backupId);
       assert.equal(engineResponse.status, 200);
       assert.equal(engineResult.candidates[0].candidateType, "missing");
+      assert.equal(saveScenarioResponse.status, 200);
+      assert.equal(savedScenario.id, "door-left-wall");
+      assert.equal(scenarioList.length, 1);
+      assert.equal(scenarioShow.name, "Door Left Wall");
+      assert.equal(initialReview.reviews.length, 0);
+      assert.equal(reviewSaveResponse.status, 200);
+      assert.equal(savedReview.reviews[0].status, "confirm");
     } finally {
       await new Promise((resolve) => server.close(resolve));
     }

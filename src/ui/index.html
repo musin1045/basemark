@@ -13,7 +13,8 @@
           <p class="eyebrow">BaseMark</p>
           <h1>Comparison Engine Workbench</h1>
           <p class="brand-copy">
-            도면 기준 구조를 현장 장면에 맞춰 계산하고, 비교 후보를 사람이 검토할 수 있게 만드는 로컬 앱.
+            Drawings define the structure. The engine aligns one local field
+            segment, computes comparison candidates, and keeps the result easy to review.
           </p>
         </div>
 
@@ -31,7 +32,7 @@
 
         <section class="sidebar-card">
           <p class="sidebar-label">Current Scenario</p>
-          <strong id="scenario-name">door-left-wall</strong>
+          <strong id="scenario-name">Door Left Wall</strong>
           <span id="scenario-detail">Editable local draft</span>
         </section>
       </aside>
@@ -56,9 +57,9 @@
               <p class="eyebrow">Fixed Identity</p>
               <h3>BaseMark is a comparison engine first.</h3>
               <p>
-                구조 앵커 선택, 정규화 좌표, 국소 정합, 그리고
-                <code>missing</code>/<code>extra</code>/<code>position_diff</code>
-                후보 생성이 본체입니다. 저장과 보고서는 운영층입니다.
+                Structural anchor selection, normalized coordinates, local alignment,
+                and <code>missing</code>/<code>extra</code>/<code>position_diff</code>
+                candidate generation are the product core. Storage and reports are the operating layer.
               </p>
             </div>
 
@@ -91,26 +92,38 @@
                   <h3>Pipeline</h3>
                 </div>
                 <ol class="plain-list">
-                  <li>Choose stable anchors for one local segment.</li>
-                  <li>Project normalized checkpoints from the drawing frame.</li>
-                  <li>Align the local segment and calculate candidate evidence.</li>
-                  <li>Hand the result to a human reviewer.</li>
+                  <li>Select stable anchors for one bounded local segment.</li>
+                  <li>Define normalized checkpoints against those anchors.</li>
+                  <li>Align the local field segment and project expected positions.</li>
+                  <li>Generate candidate evidence for human review.</li>
                 </ol>
               </section>
 
               <section class="panel">
                 <div class="panel-header">
-                  <h3>Editable Workflow</h3>
+                  <h3>Visual UI Focus</h3>
                 </div>
                 <p class="panel-copy">
-                  엔진 입력은 화면에서 바로 수정되고 브라우저에 임시 저장됩니다.
-                  언제든지 시나리오를 바꾸고 다시 실행할 수 있습니다.
+                  The engine screen pairs editable JSON with a canvas view.
+                  You can scan anchors, checkpoints, observed elements, and candidates without reading raw payloads first.
                 </p>
                 <div class="tag-row">
-                  <span class="tag">Local draft autosave</span>
-                  <span class="tag">Engine-only run</span>
-                  <span class="tag">Human review output</span>
+                  <span class="tag">Canvas overlay</span>
+                  <span class="tag">Saved scenarios</span>
+                  <span class="tag">Human review cards</span>
                 </div>
+              </section>
+
+              <section class="panel">
+                <div class="panel-header">
+                  <h3>Reading Order</h3>
+                </div>
+                <ol class="plain-list">
+                  <li>Confirm scenario metadata and metrics first.</li>
+                  <li>Use the canvas to validate structure and point placement.</li>
+                  <li>Check summary cards and projected checkpoints.</li>
+                  <li>Use candidate cards before falling back to raw JSON.</li>
+                </ol>
               </section>
             </div>
           </section>
@@ -119,33 +132,211 @@
             <div class="engine-grid">
               <section class="panel editor-panel">
                 <div class="panel-header">
-                  <h3>Scenario JSON</h3>
+                  <h3>Scenario Builder / 시나리오 빌더</h3>
                   <button data-action="format-scenario">Format</button>
                 </div>
                 <p class="panel-copy">
-                  로컬 구간, 구조 앵커, 정규화 체크포인트, 관측 요소를 수정합니다.
+                  카드형 폼으로 구간, 앵커, 체크포인트, 관측 요소를 먼저 정리하고 필요할 때만 JSON을 직접 수정합니다.
+                  Fill the cards first, then touch raw JSON only when needed.
                 </p>
+
+                <div class="scenario-toolbar">
+                  <label>Scenario ID<input id="scenario-id-input" type="text" value="door-left-wall"></label>
+                  <label>Scenario Name<input id="scenario-title-input" type="text" value="Door Left Wall"></label>
+                </div>
+
+                <label class="stacked-field">
+                  Description
+                  <textarea id="scenario-description-input" spellcheck="false"></textarea>
+                </label>
+
+                <div class="guide-strip">
+                  <span class="guide-item">구간은 한 번에 비교할 국소 장면 범위입니다.</span>
+                  <span class="guide-item">앵커는 비교 프레임을 고정하는 구조 기준점입니다.</span>
+                  <span class="guide-item">체크포인트는 상대 비율 좌표로 유지됩니다.</span>
+                </div>
+
+                <section class="builder-stack">
+                  <article class="builder-section">
+                    <div class="panel-header">
+                      <h4>구간 정보 / Segment</h4>
+                    </div>
+                    <p class="builder-copy">
+                      현재 비교할 벽면 또는 국소 구간의 식별자와 라벨입니다.
+                    </p>
+                    <div class="builder-grid builder-grid-two">
+                      <label class="builder-field">
+                        <span class="builder-label">구간 ID / Segment ID</span>
+                        <input id="form-segment-id" type="text">
+                      </label>
+                      <label class="builder-field">
+                        <span class="builder-label">구간 종류 / Segment Kind</span>
+                        <input id="form-segment-kind" type="text">
+                      </label>
+                    </div>
+                    <label class="builder-field">
+                      <span class="builder-label">구간 라벨 / Segment Label</span>
+                      <input id="form-segment-label" type="text">
+                    </label>
+                  </article>
+
+                  <article class="builder-section">
+                    <div class="panel-header">
+                      <h4>앵커 / Anchors</h4>
+                      <button type="button" data-action="add-anchor">앵커 추가 / Add Anchor</button>
+                    </div>
+                    <p class="builder-copy">
+                      문틀, 코너, 프레임처럼 비교 기준으로 삼을 구조점을 관리합니다.
+                    </p>
+                    <div id="anchor-form-list" class="stack-list"></div>
+                  </article>
+
+                  <article class="builder-section">
+                    <div class="panel-header">
+                      <h4>체크포인트 / Checkpoints</h4>
+                      <button type="button" data-action="add-checkpoint">체크포인트 추가 / Add Checkpoint</button>
+                    </div>
+                    <p class="builder-copy">
+                      정규화 좌표로 정의되는 예상 위치입니다. 엔진은 이 지점을 투영해 후보를 계산합니다.
+                    </p>
+                    <div id="checkpoint-form-list" class="stack-list"></div>
+                  </article>
+
+                  <article class="builder-section">
+                    <div class="panel-header">
+                      <h4>관측 요소 / Observed Elements</h4>
+                      <button type="button" data-action="add-observed">관측 요소 추가 / Add Observed</button>
+                    </div>
+                    <p class="builder-copy">
+                      현장 장면에서 실제로 보이는 요소입니다. 캔버스에서 직접 끌어 위치를 수정할 수 있습니다.
+                    </p>
+                    <div id="observed-form-list" class="stack-list"></div>
+                  </article>
+                </section>
+
+                <div class="panel-header">
+                  <h4>보조 JSON 편집기 / Raw JSON</h4>
+                </div>
                 <textarea id="engine-scenario-input" spellcheck="false"></textarea>
+
                 <div class="editor-actions">
+                  <button data-action="save-scenario">Save Scenario</button>
+                  <button data-action="list-scenarios">Refresh List</button>
                   <button data-action="load-missing-example">Missing Example</button>
                   <button data-action="load-position-example">Position Diff Example</button>
                   <button data-action="load-extra-example">Extra Example</button>
+                </div>
+
+                <section class="builder-section">
+                  <div class="panel-header">
+                    <h4>사진 + 도면 사용 방식 / Photo + Drawing Workflow</h4>
+                  </div>
+                  <p class="builder-copy">
+                    BaseMark는 사진을 이해하는 범용 AI가 아니라, 도면 기준 구조를 이용해 사진의 국소 장면을 계산적으로 비교합니다.
+                  </p>
+                  <ol class="plain-list workflow-list">
+                    <li>도면은 구조 기준입니다. 문틀, 코너, 벽 경계 같은 앵커와 체크포인트의 상대 위치를 먼저 정의합니다.</li>
+                    <li>사진은 현장 증거입니다. 같은 국소 구간에서 실제로 보이는 앵커와 관측 요소 좌표를 입력합니다.</li>
+                    <li>엔진은 도면의 상대 좌표를 현장 사진 좌표로 투영해서 missing, extra, position_diff 후보를 계산합니다.</li>
+                    <li>즉, 도면은 기준 프레임이고 사진은 비교 대상입니다. 최종 판정은 사람이 후보 카드와 캔버스를 보고 확정합니다.</li>
+                  </ol>
+                </section>
+              </section>
+
+              <section class="panel visual-panel">
+                <div class="panel-header">
+                  <h3>Visual Segment View</h3>
+                  <button data-action="run-engine">Run</button>
+                </div>
+                <p class="panel-copy">
+                  Anchors, normalized checkpoints, observed elements, and candidate output are layered on one local canvas.
+                </p>
+                <div class="canvas-legend">
+                  <span class="legend-item legend-anchor">Anchor</span>
+                  <span class="legend-item legend-checkpoint">Checkpoint</span>
+                  <span class="legend-item legend-observed">Observed</span>
+                  <span class="legend-item legend-missing">Missing</span>
+                  <span class="legend-item legend-position">Position Diff</span>
+                  <span class="legend-item legend-extra">Extra</span>
+                </div>
+                <div class="editor-actions">
+                  <button type="button" data-action="start-camera">Start Camera</button>
+                  <button type="button" data-action="capture-camera">Capture Frame</button>
+                  <button type="button" data-action="stop-camera">Stop Camera</button>
+                </div>
+                <div class="canvas-frame">
+                  <div class="camera-surface">
+                    <img id="visual-still" class="visual-media is-hidden" alt="Captured field frame">
+                    <video id="visual-video" class="visual-media is-hidden" autoplay playsinline muted></video>
+                    <div id="visual-canvas"></div>
+                  </div>
+                </div>
+                <div id="visual-caption" class="visual-caption">
+                  Edit or run the scenario to refresh the canvas view.
+                </div>
+              </section>
+            </div>
+
+            <div class="results-grid">
+              <section class="panel result-panel">
+                <div class="panel-header">
+                  <h3>Saved Scenarios</h3>
+                  <button data-action="list-scenarios">Refresh</button>
+                </div>
+                <div id="scenario-list" class="summary-stack">
+                  <p>No saved scenarios yet.</p>
                 </div>
               </section>
 
               <section class="panel result-panel">
                 <div class="panel-header">
                   <h3>Run Summary</h3>
-                  <button data-action="run-engine">Run</button>
                 </div>
                 <div id="engine-summary" class="summary-stack">
                   <p>Run the engine to inspect alignment and candidate output.</p>
                 </div>
-                <div class="panel-header panel-subhead">
-                  <h3>Candidate Cards</h3>
+              </section>
+            </div>
+
+            <div class="results-grid">
+              <section class="panel result-panel">
+                <div class="panel-header">
+                  <h3>Projected Checkpoints</h3>
+                </div>
+                <div id="projected-checkpoints" class="summary-stack">
+                  <p>No projected checkpoint data yet.</p>
+                </div>
+              </section>
+
+              <section class="panel result-panel">
+                <div class="panel-header">
+                  <h3>Candidate Review</h3>
+                </div>
+                <div id="review-summary" class="summary-stack">
+                  <p>No review summary yet.</p>
                 </div>
                 <div id="candidate-cards" class="candidate-grid">
                   <p class="empty-state">No candidate output yet.</p>
+                </div>
+              </section>
+            </div>
+
+            <div class="results-grid">
+              <section class="panel result-panel">
+                <div class="panel-header">
+                  <h3>Scenario Validation</h3>
+                </div>
+                <div id="validation-summary" class="summary-stack">
+                  <p>Validation has not run yet.</p>
+                </div>
+              </section>
+
+              <section class="panel result-panel">
+                <div class="panel-header">
+                  <h3>Selected Candidate</h3>
+                </div>
+                <div id="candidate-detail" class="summary-stack">
+                  <p>Select a candidate card to inspect the evidence basis.</p>
                 </div>
               </section>
             </div>
@@ -166,7 +357,8 @@
                   <h3>Operating Layer</h3>
                 </div>
                 <p class="panel-copy">
-                  이 영역은 저장, 보고서, 백업 같은 운영층을 요약합니다. 비교 엔진 본체와 구분됩니다.
+                  This area summarizes storage, reporting, and backup concerns.
+                  It is intentionally separate from the comparison engine core.
                 </p>
                 <div class="tag-row">
                   <span class="tag">Frozen baseline</span>
@@ -187,6 +379,7 @@
                   <li><code>/api/report/generate</code></li>
                   <li><code>/api/backup/export</code></li>
                   <li><code>/api/engine/run</code></li>
+                  <li><code>/api/engine/scenario/save</code></li>
                 </ul>
               </section>
             </div>
@@ -194,6 +387,7 @@
         </section>
       </section>
     </main>
+    <script src="/vendor/konva.min.js"></script>
     <script type="module" src="/app.js"></script>
   </body>
 </html>

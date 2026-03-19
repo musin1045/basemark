@@ -1,0 +1,13 @@
+startedAt=2026-03-18T15:30:06.610Z
+baseUrl=http://127.0.0.1:3020
+dataDir=C:\basemark\artifacts\soak-smoke-data
+durationMs=2500
+intervalMs=500
+[2026-03-18T15:30:06.611Z] cycle=1 status=ok project=soak-project-1773847806611-1 record=soak-record-1773847806611-1 report=report-soak-record-1773847806611-1 backup=backup-soak-project-1773847806611-1-20260318153006
+[2026-03-18T15:30:07.204Z] cycle=2 status=ok project=soak-project-1773847807204-2 record=soak-record-1773847807204-2 report=report-soak-record-1773847807204-2 backup=backup-soak-project-1773847807204-2-20260318153007
+[2026-03-18T15:30:07.758Z] cycle=3 status=ok project=soak-project-1773847807758-3 record=soak-record-1773847807758-3 report=report-soak-record-1773847807758-3 backup=backup-soak-project-1773847807758-3-20260318153007
+[2026-03-18T15:30:08.312Z] cycle=4 status=ok project=soak-project-1773847808312-4 record=soak-record-1773847808312-4 report=report-soak-record-1773847808312-4 backup=backup-soak-project-1773847808312-4-20260318153008
+[2026-03-18T15:30:08.868Z] cycle=5 status=ok project=soak-project-1773847808868-5 record=soak-record-1773847808868-5 report=report-soak-record-1773847808868-5 backup=backup-soak-project-1773847808868-5-20260318153008
+finishedAt=2026-03-18T15:30:09.423Z
+successCount=5
+failureCount=0

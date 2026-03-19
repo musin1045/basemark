@@ -102,3 +102,27 @@ test("LocalStore reads and writes raw text under a relative path", async () => {
     await rm(tempRoot, { recursive: true, force: true });
   }
 });
+
+test("LocalStore detects concurrent modification when expectedSavedAt is stale", async () => {
+  const tempRoot = await mkdtemp(path.join(os.tmpdir(), "basemark-store-"));
+
+  try {
+    const store = new LocalStore({ rootDir: tempRoot });
+
+    await store.writeDocument("records/record-1.json", { id: "record-1" });
+    const first = await store.readDocument("records/record-1.json");
+    await store.writeDocument("records/record-1.json", { id: "record-1", version: 2 });
+
+    await assert.rejects(
+      () =>
+        store.writeDocument(
+          "records/record-1.json",
+          { id: "record-1", version: 3 },
+          { expectedSavedAt: first.savedAt }
+        ),
+      /Concurrent modification detected/
+    );
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});

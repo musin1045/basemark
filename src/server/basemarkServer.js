@@ -5,17 +5,27 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { BaseMarkService } from "../app/baseMarkService.js";
 import { generateComparisonCandidates } from "../engine/baseMarkEngine.js";
+import { ReviewRepository } from "../engine/reviewRepository.js";
+import { EngineScenarioRepository } from "../engine/scenarioRepository.js";
 import { BaseMarkRepository } from "../storage/basemarkRepository.js";
 import { LocalStore } from "../storage/localStore.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UI_DIR = path.resolve(__dirname, "../ui");
+const KONVA_VENDOR_PATH = path.resolve(process.cwd(), "node_modules/konva/konva.min.js");
+const UI_ENGINE_DIR = path.resolve(UI_DIR, "engine");
 
-function createService(dataDir) {
+function createRuntime(dataDir) {
   const store = new LocalStore({ rootDir: dataDir });
   const repository = new BaseMarkRepository({ store });
+  const engineScenarioRepository = new EngineScenarioRepository({ store });
+  const reviewRepository = new ReviewRepository({ store });
 
-  return new BaseMarkService({ repository });
+  return {
+    service: new BaseMarkService({ repository }),
+    engineScenarioRepository,
+    reviewRepository
+  };
 }
 
 function sendJson(response, statusCode, payload) {
@@ -50,7 +60,9 @@ async function serveStatic(response, fileName, contentType) {
   response.end(source);
 }
 
-async function handleApi(request, response, service, url) {
+async function handleApi(request, response, runtime, url) {
+  const { service, engineScenarioRepository, reviewRepository } = runtime;
+
   if (request.method === "GET" && url.pathname === "/api/projects") {
     return sendJson(response, 200, await service.listProjects());
   }
@@ -139,19 +151,49 @@ async function handleApi(request, response, service, url) {
     );
   }
 
+  if (request.method === "GET" && url.pathname === "/api/engine/scenarios") {
+    return sendJson(response, 200, await engineScenarioRepository.listScenarios());
+  }
+
+  if (request.method === "GET" && url.pathname === "/api/engine/scenario/show") {
+    const scenarioId = url.searchParams.get("scenarioId");
+    return sendJson(response, 200, await engineScenarioRepository.readScenario(scenarioId));
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/engine/scenario/save") {
+    return sendJson(
+      response,
+      200,
+      await engineScenarioRepository.saveScenario(await readBody(request))
+    );
+  }
+
+  if (request.method === "GET" && url.pathname === "/api/engine/review/show") {
+    const scenarioId = url.searchParams.get("scenarioId");
+    return sendJson(response, 200, await reviewRepository.readSession(scenarioId));
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/engine/review/save") {
+    return sendJson(
+      response,
+      200,
+      await reviewRepository.saveReview(await readBody(request))
+    );
+  }
+
   return false;
 }
 
 export function createBaseMarkServer(options = {}) {
   const dataDir = options.dataDir ?? path.resolve(process.cwd(), "data");
-  const service = createService(dataDir);
+  const runtime = createRuntime(dataDir);
 
   return createServer(async (request, response) => {
     const url = new URL(request.url, "http://127.0.0.1");
 
     try {
       if (url.pathname.startsWith("/api/")) {
-        const handled = await handleApi(request, response, service, url);
+        const handled = await handleApi(request, response, runtime, url);
 
         if (handled === false) {
           sendJson(response, 404, { error: `Unknown API route: ${url.pathname}` });
@@ -172,6 +214,25 @@ export function createBaseMarkServer(options = {}) {
 
       if (request.method === "GET" && url.pathname === "/styles.css") {
         await serveStatic(response, "styles.css", "text/css; charset=utf-8");
+        return;
+      }
+
+      if (request.method === "GET" && url.pathname.startsWith("/engine/")) {
+        const fileName = url.pathname.replace("/engine/", "");
+        const source = await readFile(path.join(UI_ENGINE_DIR, fileName), "utf8");
+        response.writeHead(200, {
+          "content-type": "application/javascript; charset=utf-8"
+        });
+        response.end(source);
+        return;
+      }
+
+      if (request.method === "GET" && url.pathname === "/vendor/konva.min.js") {
+        const source = await readFile(KONVA_VENDOR_PATH, "utf8");
+        response.writeHead(200, {
+          "content-type": "application/javascript; charset=utf-8"
+        });
+        response.end(source);
         return;
       }
 

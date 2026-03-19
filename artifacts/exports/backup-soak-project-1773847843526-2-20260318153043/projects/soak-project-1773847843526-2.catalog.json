@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "savedAt": "2026-03-18T15:30:43.531Z-e4fecc5a-f4fd-464d-a5a2-dfa1bd0a0ca5",
+  "payload": {
+    "projectId": "soak-project-1773847843526-2",
+    "units": [
+      {
+        "id": "unit-baseline",
+        "projectId": "soak-project-1773847843526-2",
+        "name": "101",
+        "kind": "baseline"
+      },
+      {
+        "id": "unit-comparison",
+        "projectId": "soak-project-1773847843526-2",
+        "name": "102",
+        "kind": "comparison"
+      }
+    ],
+    "spaces": [
+      {
+        "id": "space-1",
+        "unitId": "unit-baseline",
+        "name": "Living Room",
+        "label": null
+      }
+    ],
+    "checkpoints": [
+      {
+        "id": "cp-1",
+        "unitId": "unit-baseline",
+        "spaceId": "space-1",
+        "label": "Window A",
+        "mapPin": null
+      }
+    ]
+  }
+}

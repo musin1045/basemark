@@ -86,11 +86,11 @@ export class BaseMarkRepository {
     return createProjectCatalog(document.payload);
   }
 
-  async saveInspectionRecord(record) {
+  async saveInspectionRecord(record, options = {}) {
     const payload = createInspectionRecord(record);
     const fileName = this.getInspectionRecordPath(payload.id);
 
-    await this.store.writeDocument(fileName, payload);
+    await this.store.writeDocument(fileName, payload, options);
     return fileName;
   }
 
@@ -99,6 +99,17 @@ export class BaseMarkRepository {
       this.getInspectionRecordPath(recordId)
     );
     return createInspectionRecord(document.payload);
+  }
+
+  async readInspectionRecordEnvelope(recordId) {
+    const document = await this.store.readDocument(
+      this.getInspectionRecordPath(recordId)
+    );
+
+    return {
+      savedAt: document.savedAt,
+      record: createInspectionRecord(document.payload)
+    };
   }
 
   async listInspectionRecords(projectId) {

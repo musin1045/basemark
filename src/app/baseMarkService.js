@@ -1,4 +1,12 @@
-import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  mkdtemp,
+  readdir,
+  readFile,
+  rename,
+  rm,
+  writeFile
+} from "node:fs/promises";
 import path from "node:path";
 import { createHash } from "node:crypto";
 
@@ -95,6 +103,14 @@ function assertRecordMutable(record) {
 
 function createSha256(value) {
   return createHash("sha256").update(value).digest("hex");
+}
+
+function assertFileChecksum(filePath, raw, expectedSha256) {
+  const actualSha256 = createSha256(raw);
+
+  if (actualSha256 !== expectedSha256) {
+    throw new Error(`Backup file checksum mismatch: ${filePath}.`);
+  }
 }
 
 function createTimestampIdPart(createdAt) {
@@ -299,7 +315,9 @@ export class BaseMarkService {
   }
 
   async appendInspectionItem(input) {
-    const record = await this.repository.readInspectionRecord(input.recordId);
+    const { savedAt, record } = await this.repository.readInspectionRecordEnvelope(
+      input.recordId
+    );
     assertRecordMutable(record);
     assertCheckpointInFrozenBaseline(record, input.item.checkpointId);
 
@@ -313,7 +331,9 @@ export class BaseMarkService {
       items: [...record.items, item]
     });
 
-    await this.repository.saveInspectionRecord(nextRecord);
+    await this.repository.saveInspectionRecord(nextRecord, {
+      expectedSavedAt: savedAt
+    });
     return nextRecord;
   }
 
@@ -331,11 +351,15 @@ export class BaseMarkService {
 
   async exportProjectBackup(projectId) {
     const project = await this.repository.readProject(projectId);
-    const catalog = await this.repository.readProjectCatalog(projectId);
+    await this.repository.readProjectCatalog(projectId);
     const records = await this.repository.listInspectionRecords(projectId);
     const reports = await this.listReports(projectId);
     const createdAt = new Date().toISOString();
     const backupId = `backup-${projectId}-${createTimestampIdPart(createdAt)}`;
+    await ensureDirectory(this.exportDir);
+    const tempPackagePath = await mkdtemp(
+      path.join(this.exportDir, `${backupId}-tmp-`)
+    );
     const packagePath = path.join(this.exportDir, backupId);
     const files = [
       this.repository.getProjectPath(projectId),
@@ -345,44 +369,48 @@ export class BaseMarkService {
       ...reports.map((report) => report.fileName)
     ];
 
-    await ensureDirectory(packagePath);
-
     const fileEntries = [];
 
-    for (const fileName of files) {
-      const raw = await this.repository.store.readRawText(fileName);
-      const targetPath = path.join(packagePath, fileName);
+    try {
+      for (const fileName of files) {
+        const raw = await this.repository.store.readRawText(fileName);
+        const targetPath = path.join(tempPackagePath, fileName);
 
-      await ensureDirectory(path.dirname(targetPath));
-      await writeFile(targetPath, raw, "utf8");
-      fileEntries.push({
-        path: fileName.replace(/\\/g, "/"),
-        sha256: createSha256(raw)
+        await ensureDirectory(path.dirname(targetPath));
+        await writeFile(targetPath, raw, "utf8");
+        fileEntries.push({
+          path: fileName.replace(/\\/g, "/"),
+          sha256: createSha256(raw)
+        });
+      }
+
+      const manifest = createBackupManifest({
+        id: backupId,
+        createdAt,
+        schemaVersion: String(SCHEMA_VERSION),
+        projectIds: [project.id],
+        fileCount: fileEntries.length,
+        exportMode: "manual_folder",
+        files: fileEntries
       });
+
+      await writeFile(
+        path.join(tempPackagePath, "manifest.json"),
+        JSON.stringify(manifest, null, 2),
+        "utf8"
+      );
+      await rename(tempPackagePath, packagePath);
+      await this.repository.saveBackupManifest(manifest);
+
+      return {
+        backupId,
+        packagePath,
+        manifest
+      };
+    } catch (error) {
+      await rm(tempPackagePath, { recursive: true, force: true });
+      throw error;
     }
-
-    const manifest = createBackupManifest({
-      id: backupId,
-      createdAt,
-      schemaVersion: String(SCHEMA_VERSION),
-      projectIds: [project.id],
-      fileCount: fileEntries.length,
-      exportMode: "manual_folder",
-      files: fileEntries
-    });
-
-    await writeFile(
-      path.join(packagePath, "manifest.json"),
-      JSON.stringify(manifest, null, 2),
-      "utf8"
-    );
-    await this.repository.saveBackupManifest(manifest);
-
-    return {
-      backupId,
-      packagePath,
-      manifest
-    };
   }
 
   async inspectBackupPackage(backupId) {
@@ -423,6 +451,7 @@ export class BaseMarkService {
 
     for (const file of manifest.files) {
       const raw = await readFile(path.join(packagePath, file.path), "utf8");
+      assertFileChecksum(file.path, raw, file.sha256);
       const document = JSON.parse(raw);
 
       if (file.path.startsWith("projects/") && file.path.endsWith(".catalog.json")) {
@@ -549,7 +578,9 @@ export class BaseMarkService {
   }
 
   async #updateInspectionRecordStatus(recordId, nextStatus) {
-    const record = await this.repository.readInspectionRecord(recordId);
+    const { savedAt, record } = await this.repository.readInspectionRecordEnvelope(
+      recordId
+    );
     assertRecordStatusTransition(record.status, nextStatus);
 
     const nextRecord = createInspectionRecord({
@@ -557,7 +588,9 @@ export class BaseMarkService {
       status: nextStatus
     });
 
-    await this.repository.saveInspectionRecord(nextRecord);
+    await this.repository.saveInspectionRecord(nextRecord, {
+      expectedSavedAt: savedAt
+    });
     return nextRecord;
   }
 }
