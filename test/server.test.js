@@ -29,9 +29,13 @@ test("Local server serves the V1 shell page", async () => {
     try {
       const response = await fetch(baseUrl);
       const html = await response.text();
+      const appJsResponse = await fetch(`${baseUrl}/app.js`);
+      const appJs = await appJsResponse.text();
 
       assert.equal(response.status, 200);
-      assert.match(html, /BaseMark V1 Local Shell/);
+      assert.match(html, /BaseMark V1 Local App/);
+      assert.equal(appJsResponse.status, 200);
+      assert.match(appJs, /runEngine/);
     } finally {
       await new Promise((resolve) => server.close(resolve));
     }
@@ -174,6 +178,63 @@ test("Local server runs the workspace and record flow through HTTP routes", asyn
         `${baseUrl}/api/backup/show?backupId=${encodeURIComponent(exportedBackup.backupId)}`
       );
       const backupDetails = await backupShowResponse.json();
+      const engineResponse = await fetch(`${baseUrl}/api/engine/run`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          segment: {
+            segmentId: "segment-door-left-wall",
+            segmentKind: "wall_strip",
+            label: "Door-left wall segment"
+          },
+          anchors: [
+            {
+              anchorId: "anchor-left",
+              segmentId: "segment-door-left-wall",
+              anchorKind: "door_frame_edge",
+              geometryType: "point",
+              drawingReference: { point: { x: 0, y: 0 } },
+              fieldObservation: { point: { x: 100, y: 120 } },
+              stabilityScore: 0.96,
+              visibilityState: "visible"
+            },
+            {
+              anchorId: "anchor-right",
+              segmentId: "segment-door-left-wall",
+              anchorKind: "wall_corner",
+              geometryType: "point",
+              drawingReference: { point: { x: 1, y: 0 } },
+              fieldObservation: { point: { x: 300, y: 120 } },
+              stabilityScore: 0.92,
+              visibilityState: "visible"
+            }
+          ],
+          checkpoints: [
+            {
+              checkpointId: "checkpoint-switch",
+              segmentId: "segment-door-left-wall",
+              anchorBasis: ["anchor-left", "anchor-right"],
+              coordinateModel: "span_ratio_plus_height_ratio",
+              normalizedPosition: {
+                spanRatio: 0.5,
+                heightRatio: -0.1
+              },
+              allowedTolerance: {
+                positionSpanRatio: 0.05,
+                searchSpanRatio: 0.2
+              },
+              semanticExpectation: "switch_box"
+            }
+          ],
+          fieldEvidence: {
+            evidenceId: "evidence-1",
+            segmentId: "segment-door-left-wall",
+            imageRef: "fixtures/door-left-wall.jpg"
+          },
+          observedElements: []
+        })
+      });
+      const engineResult = await engineResponse.json();
 
       assert.equal(workspace.project.id, "project-1");
       assert.equal(projects.length, 1);
@@ -190,6 +251,8 @@ test("Local server runs the workspace and record flow through HTTP routes", asyn
       assert.equal(exportedBackup.manifest.projectIds[0], "project-1");
       assert.equal(backups.length, 1);
       assert.equal(backupDetails.manifest.id, exportedBackup.backupId);
+      assert.equal(engineResponse.status, 200);
+      assert.equal(engineResult.candidates[0].candidateType, "missing");
     } finally {
       await new Promise((resolve) => server.close(resolve));
     }

@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { BaseMarkService } from "../app/baseMarkService.js";
+import { generateComparisonCandidates } from "../engine/baseMarkEngine.js";
 import { BaseMarkRepository } from "../storage/basemarkRepository.js";
 import { LocalStore } from "../storage/localStore.js";
 
@@ -128,6 +129,14 @@ async function handleApi(request, response, service, url) {
   if (request.method === "POST" && url.pathname === "/api/backup/restore") {
     const payload = await readBody(request);
     return sendJson(response, 200, await service.restoreBackupPackage(payload.backupId));
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/engine/run") {
+    return sendJson(
+      response,
+      200,
+      generateComparisonCandidates(await readBody(request))
+    );
   }
 
   return false;
