@@ -57,6 +57,11 @@ button:hover {
   box-shadow: 0 14px 26px rgba(187, 76, 46, 0.2);
 }
 
+button.is-active {
+  background: linear-gradient(180deg, var(--accent), var(--accent-deep));
+  box-shadow: 0 14px 26px rgba(187, 76, 46, 0.2);
+}
+
 textarea,
 input,
 select {
@@ -187,7 +192,8 @@ code {
 .topbar-actions,
 .editor-actions,
 .tag-row,
-.canvas-legend {
+.canvas-legend,
+.step-strip {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
@@ -257,6 +263,73 @@ code {
 .candidate-grid {
   display: grid;
   gap: 12px;
+}
+
+.concept-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.concept-card {
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: rgba(22, 34, 44, 0.04);
+}
+
+.concept-card strong {
+  display: block;
+  font-size: 0.95rem;
+}
+
+.concept-card p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.step-chip {
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(22, 34, 44, 0.08);
+  background: linear-gradient(135deg, rgba(187, 76, 46, 0.08), rgba(46, 102, 135, 0.08));
+  color: var(--ink);
+}
+
+.step-chip.is-active {
+  background: linear-gradient(135deg, rgba(187, 76, 46, 0.18), rgba(141, 49, 24, 0.18));
+  border-color: rgba(187, 76, 46, 0.3);
+  color: #7f2e18;
+}
+
+.field-guide-card {
+  margin-bottom: 14px;
+  padding: 16px 18px;
+  border-radius: 20px;
+  border: 1px solid rgba(187, 76, 46, 0.12);
+  background: linear-gradient(135deg, rgba(187, 76, 46, 0.08), rgba(255, 255, 255, 0.9));
+}
+
+.field-guide-kicker {
+  margin: 0 0 8px;
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.field-guide-card h4 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.field-guide-card p:last-child {
+  margin: 10px 0 0;
+  color: var(--muted);
+  line-height: 1.55;
 }
 
 .summary-stack p,
@@ -459,6 +532,11 @@ code {
   background: rgba(255, 255, 255, 0.82);
 }
 
+.form-card.is-selected {
+  border-color: rgba(242, 143, 59, 0.7);
+  box-shadow: 0 0 0 3px rgba(242, 143, 59, 0.16);
+}
+
 .form-card h5 {
   margin: 0;
   font-size: 1rem;
@@ -594,6 +672,10 @@ code {
   z-index: 2;
 }
 
+#visual-canvas.is-placement-active {
+  cursor: crosshair;
+}
+
 .visual-caption {
   margin-top: 12px;
 }
@@ -707,7 +789,8 @@ code {
   .builder-grid-two,
   .advanced-grid,
   .mini-metric-grid,
-  .field-hero {
+  .field-hero,
+  .concept-grid {
     grid-template-columns: 1fr;
   }
 

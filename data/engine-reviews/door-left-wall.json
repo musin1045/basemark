@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "savedAt": "2026-03-20T11:43:50.987Z-678a0e24-ae49-4bff-809b-cf7fa61c471e",
+  "payload": {
+    "scenarioId": "door-left-wall",
+    "updatedAt": "2026-03-20T11:43:50.987Z",
+    "reviews": [
+      {
+        "candidateId": "candidate-checkpoint-switch-missing",
+        "status": "reject",
+        "note": "",
+        "updatedAt": "2026-03-20T11:43:50.986Z"
+      }
+    ]
+  }
+}

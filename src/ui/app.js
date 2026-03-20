@@ -68,6 +68,7 @@ let currentReviewSession = {
 let selectedCandidateId = null;
 let cameraStream = null;
 let placementMode = "none";
+let selectedBuilderEntity = null;
 
 function stringify(value) {
   return JSON.stringify(value, null, 2);
@@ -171,11 +172,101 @@ function renderPlacementStatus() {
 
   tag.textContent = getPlacementLabel(placementMode);
   tag.classList.toggle("is-active", placementMode !== "none");
+
+  for (const button of document.querySelectorAll("[data-placement-mode]")) {
+    button.classList.toggle("is-active", button.dataset.placementMode === placementMode);
+  }
+
+  const canvas = document.querySelector("#visual-canvas");
+  if (canvas) {
+    canvas.classList.toggle("is-placement-active", placementMode !== "none");
+  }
+}
+
+function renderFieldGuide(scenario = parseScenario()) {
+  const title = document.querySelector("#field-guide-title");
+  const body = document.querySelector("#field-guide-body");
+  if (!title || !body) {
+    return;
+  }
+
+  const anchorCount = scenario.anchors?.length ?? 0;
+  const observedCount = scenario.observedElements?.length ?? 0;
+  let activeStep = "anchors";
+
+  if (placementMode === "anchor") {
+    activeStep = "anchors";
+    if (anchorCount === 0) {
+      title.textContent = "첫 번째 기준점을 찍으세요.";
+      body.textContent =
+        "기준점은 문틀 끝이나 벽 모서리처럼 잘 안 바뀌는 위치입니다. 사진에서 가장 잘 보이는 기준점 하나를 누르세요.";
+    } else if (anchorCount === 1) {
+      title.textContent = "두 번째 기준점을 찍으세요.";
+      body.textContent =
+        "첫 번째 기준점과 떨어진 다른 기준점을 찍으세요. 기준점이 두 개 있어야 도면 기준을 현장에 맞출 수 있습니다.";
+    } else {
+      title.textContent = "새 기준점을 추가하는 중입니다.";
+      body.textContent =
+        "이미 기준점이 충분히 있으면 더 찍지 않아도 됩니다. 꼭 필요한 추가 기준점이 있을 때만 누르세요.";
+    }
+  } else if (placementMode === "observed") {
+    activeStep = "observed";
+    title.textContent = "현장에서 실제로 보이는 대상을 찍으세요.";
+    body.textContent =
+      "예를 들면 스위치 박스, 콘센트 박스, 노출된 포인트처럼 사진에서 실제로 확인되는 대상을 누르면 됩니다.";
+  } else if (anchorCount < 2) {
+    activeStep = "anchors";
+    title.textContent = "먼저 기준점 2개를 잡으세요.";
+    body.textContent =
+      "기준점은 문틀 끝이나 벽 모서리처럼 잘 안 바뀌는 위치입니다. 왼쪽 하나, 오른쪽 하나처럼 서로 떨어진 두 점을 먼저 잡으세요.";
+  } else if (observedCount === 0) {
+    activeStep = "observed";
+    title.textContent = "이제 현장에서 보이는 대상을 찍으세요.";
+    body.textContent =
+      "기준점은 준비됐습니다. 이제 사진에서 실제로 보이는 스위치나 박스 같은 대상을 눌러 위치를 기록하세요.";
+  } else if (!lastRunResult) {
+    activeStep = "run";
+    title.textContent = "이제 후보 찾기를 누르세요.";
+    body.textContent =
+      "기준점과 보이는 대상이 준비됐습니다. 이제 후보 찾기를 눌러 빠짐, 추가, 위치 차이 후보를 계산하세요.";
+  } else {
+    activeStep = "run";
+    title.textContent = "오른쪽 후보 카드에서 결과를 검토하세요.";
+    body.textContent =
+      "후보를 누르면 근거가 보입니다. 맞으면 확정, 아니면 반려, 판단이 어려우면 보류로 표시하면 됩니다.";
+  }
+
+  for (const chip of document.querySelectorAll("[data-step-chip]")) {
+    chip.classList.toggle("is-active", chip.dataset.stepChip === activeStep);
+  }
 }
 
 function setPlacementMode(mode) {
   placementMode = mode;
   renderPlacementStatus();
+  renderFieldGuide();
+}
+
+function setSelectedBuilderEntity(kind, id, options = {}) {
+  selectedBuilderEntity = kind && id ? { kind, id } : null;
+  renderBuilderSelection();
+
+  if (options.scroll) {
+    const target = document.querySelector(
+      `.form-card[data-builder-kind="${kind}"][data-builder-id="${id}"]`
+    );
+    target?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
+}
+
+function renderBuilderSelection() {
+  for (const card of document.querySelectorAll(".form-card[data-builder-kind]")) {
+    const isSelected =
+      selectedBuilderEntity &&
+      card.dataset.builderKind === selectedBuilderEntity.kind &&
+      card.dataset.builderId === selectedBuilderEntity.id;
+    card.classList.toggle("is-selected", Boolean(isSelected));
+  }
 }
 
 function renderMetrics(result = null) {
@@ -220,7 +311,7 @@ function setScreen(screenName) {
   }
 
   document.querySelector("#screen-title").textContent =
-    screenName === "engine" ? "Field" : screenName === "workspace" ? "Ops" : "Home";
+    screenName === "engine" ? "현장 비교" : screenName === "workspace" ? "운영" : "시작";
 }
 
 function updateScenario(mutator) {
@@ -228,10 +319,10 @@ function updateScenario(mutator) {
   mutator(nextScenario);
   writeScenarioToEditor(nextScenario);
   saveScenario();
+  lastRunResult = null;
   renderMetrics();
   renderFormBuilder();
   renderCanvas({ scenario: nextScenario, result: null });
-  lastRunResult = null;
   return nextScenario;
 }
 
@@ -296,12 +387,12 @@ function syncSegmentFormToEditor() {
   const scenario = readScenarioFromForm();
   writeScenarioToEditor(scenario);
   saveScenario();
+  lastRunResult = null;
   renderMetrics();
   renderFormBuilder();
   renderScenarioValidation(scenario);
   renderSelectedCandidateDetail(null);
   renderCanvas({ scenario, result: null });
-  lastRunResult = null;
 }
 
 function renderFormBuilder() {
@@ -317,6 +408,8 @@ function renderFormBuilder() {
   scenario.anchors.forEach((anchor, index) => {
     const card = document.createElement("article");
     card.className = "form-card";
+    card.dataset.builderKind = "anchor";
+    card.dataset.builderId = anchor.anchorId;
     card.innerHTML = `
       <h5>앵커 ${index + 1}</h5>
       <p class="form-card-copy">비교 기준 프레임을 만드는 구조 기준점입니다.</p>
@@ -386,6 +479,9 @@ function renderFormBuilder() {
       });
       setFlash(`앵커 ${anchor.anchorId}를 삭제했습니다.`);
     });
+    card.addEventListener("click", () => {
+      setSelectedBuilderEntity("anchor", anchor.anchorId);
+    });
     anchorRoot.appendChild(card);
   });
 
@@ -394,6 +490,8 @@ function renderFormBuilder() {
   scenario.checkpoints.forEach((checkpoint, index) => {
     const card = document.createElement("article");
     card.className = "form-card";
+    card.dataset.builderKind = "checkpoint";
+    card.dataset.builderId = checkpoint.checkpointId;
     card.innerHTML = `
       <h5>체크포인트 ${index + 1}</h5>
       <p class="form-card-copy">앵커 기준 상대 좌표로 정의되는 예상 위치입니다.</p>
@@ -484,6 +582,9 @@ function renderFormBuilder() {
       });
       setFlash(`체크포인트 ${checkpoint.checkpointId}를 삭제했습니다.`);
     });
+    card.addEventListener("click", () => {
+      setSelectedBuilderEntity("checkpoint", checkpoint.checkpointId);
+    });
     checkpointRoot.appendChild(card);
   });
 
@@ -492,6 +593,8 @@ function renderFormBuilder() {
   scenario.observedElements.forEach((element, index) => {
     const card = document.createElement("article");
     card.className = "form-card";
+    card.dataset.builderKind = "observed";
+    card.dataset.builderId = element.elementId;
     card.innerHTML = `
       <h5>관측 요소 ${index + 1}</h5>
       <p class="form-card-copy">현장 장면에서 실제로 보이는 요소 위치입니다.</p>
@@ -533,8 +636,13 @@ function renderFormBuilder() {
       });
       setFlash(`관측 요소 ${element.elementId}를 삭제했습니다.`);
     });
+    card.addEventListener("click", () => {
+      setSelectedBuilderEntity("observed", element.elementId);
+    });
     observedRoot.appendChild(card);
   });
+
+  renderBuilderSelection();
 }
 
 function renderSummary(result) {
@@ -852,6 +960,15 @@ function focusCandidate(candidateId) {
   }
 
   if (lastRunResult) {
+    const candidate = lastRunResult.candidates.find(
+      (entry) => entry.candidateId === candidateId
+    );
+    if (candidate?.checkpointId) {
+      setSelectedBuilderEntity("checkpoint", candidate.checkpointId, { scroll: true });
+    }
+  }
+
+  if (lastRunResult) {
     renderCanvas({ scenario: parseScenario(), result: lastRunResult });
     renderSelectedCandidateDetail(lastRunResult);
   }
@@ -860,13 +977,14 @@ function focusCandidate(candidateId) {
 function applyScenario(value) {
   writeScenarioToEditor(value);
   saveScenario();
+  lastRunResult = null;
   renderMetrics();
   renderFormBuilder();
   renderScenarioValidation(value);
   renderSelectedCandidateDetail(null);
   renderCanvas({ scenario: value, result: null });
-  lastRunResult = null;
   selectedCandidateId = null;
+  selectedBuilderEntity = null;
 }
 
 function applySavedScenario(entry) {
@@ -876,12 +994,13 @@ function applySavedScenario(entry) {
     entry.description ?? "";
   writeScenarioToEditor(entry.scenario);
   saveScenario();
+  lastRunResult = null;
   renderMetrics();
   renderFormBuilder();
   renderScenarioValidation(entry.scenario);
   renderSelectedCandidateDetail(null);
   renderCanvas({ scenario: entry.scenario, result: null });
-  lastRunResult = null;
+  selectedBuilderEntity = null;
 }
 
 function createMissingExample() {
@@ -1077,6 +1196,13 @@ function applyDraggedPoint(kind, index, point) {
       ? `Anchor moved to (${point.x}, ${point.y}).`
       : `Observed element moved to (${point.x}, ${point.y}).`
   );
+  const scenario = parseScenario();
+  if (kind === "anchor") {
+    setSelectedBuilderEntity("anchor", scenario.anchors[index]?.anchorId);
+  }
+  if (kind === "observed") {
+    setSelectedBuilderEntity("observed", scenario.observedElements[index]?.elementId);
+  }
 }
 
 function addAnchorAtPoint(point) {
@@ -1095,6 +1221,7 @@ function addAnchorAtPoint(point) {
   });
 
   setPlacementMode("none");
+  setSelectedBuilderEntity("anchor", scenario.anchors.at(-1)?.anchorId, { scroll: true });
   renderScenarioValidation(scenario);
   renderSelectedCandidateDetail(lastRunResult);
   setFlash(`Added a new anchor at (${point.x}, ${point.y}).`);
@@ -1112,6 +1239,9 @@ function addObservedAtPoint(point) {
   });
 
   setPlacementMode("none");
+  setSelectedBuilderEntity("observed", scenario.observedElements.at(-1)?.elementId, {
+    scroll: true
+  });
   renderScenarioValidation(scenario);
   renderSelectedCandidateDetail(lastRunResult);
   setFlash(`Added a new observed element at (${point.x}, ${point.y}).`);
@@ -1291,14 +1421,38 @@ function renderCanvas({ scenario, result }) {
     drawLabel(layer, candidate.candidateType, point, color);
   }
 
+  if (placementMode !== "none") {
+    const placementLabel = new window.Konva.Label({
+      x: 18,
+      y: 18,
+      opacity: 0.96,
+      listening: false
+    });
+    placementLabel.add(
+      new window.Konva.Tag({
+        fill: "rgba(187, 76, 46, 0.92)",
+        cornerRadius: 999
+      })
+    );
+    placementLabel.add(
+      new window.Konva.Text({
+        text:
+          placementMode === "anchor"
+            ? "Tap anywhere to place the next anchor"
+            : "Tap anywhere to place the next observed element",
+        fontFamily: "Georgia",
+        fontSize: 14,
+        padding: 10,
+        fill: "#fff8ee"
+      })
+    );
+    layer.add(placementLabel);
+  }
+
   currentStage.add(layer);
   currentStage.off("click tap");
   currentStage.on("click tap", (event) => {
     if (placementMode === "none") {
-      return;
-    }
-
-    if (event.target !== currentStage && event.target !== background) {
       return;
     }
 
@@ -1332,6 +1486,7 @@ function renderCanvas({ scenario, result }) {
         : "";
   document.querySelector("#visual-caption").textContent = `${baseCaption}${placementHint}`;
   renderPlacementStatus();
+  renderFieldGuide(scenario);
 }
 
 async function runEngine() {
