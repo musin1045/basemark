@@ -216,6 +216,7 @@ code {
 .metric-grid,
 .panel-grid,
 .engine-grid,
+.field-layout,
 .results-grid,
 .candidate-grid,
 .summary-card-grid,
@@ -233,8 +234,8 @@ code {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.engine-grid {
-  grid-template-columns: minmax(430px, 0.95fr) minmax(420px, 1.05fr);
+.field-layout {
+  grid-template-columns: minmax(0, 1.2fr) minmax(360px, 0.8fr);
   align-items: start;
 }
 
@@ -330,6 +331,85 @@ code {
   margin-top: 8px;
 }
 
+.field-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 20px;
+  align-items: center;
+  background:
+    radial-gradient(circle at top left, rgba(187, 76, 46, 0.12), transparent 30%),
+    linear-gradient(135deg, rgba(255, 252, 247, 0.98), rgba(246, 241, 234, 0.98));
+}
+
+.field-hero-copy h3 {
+  margin: 0;
+}
+
+.field-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.placement-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.placement-tag {
+  border: 1px solid rgba(22, 34, 44, 0.12);
+  background: rgba(22, 34, 44, 0.04);
+}
+
+.placement-tag.is-active {
+  border-color: rgba(187, 76, 46, 0.28);
+  background: rgba(187, 76, 46, 0.12);
+  color: #7f2e18;
+}
+
+.field-side {
+  display: grid;
+  gap: 16px;
+}
+
+.visual-panel-primary {
+  padding: 22px;
+}
+
+.quick-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.mini-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.mini-metric-card {
+  padding: 12px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgba(22, 34, 44, 0.04);
+}
+
+.mini-metric-card span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.mini-metric-card strong {
+  display: block;
+  margin-top: 6px;
+  font-size: 1.2rem;
+}
+
 .builder-stack,
 .stack-list {
   display: grid;
@@ -396,6 +476,41 @@ code {
 
 .form-card-actions button {
   padding: 9px 14px;
+}
+
+.advanced-panel {
+  padding: 0;
+  overflow: hidden;
+}
+
+.advanced-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px;
+  cursor: pointer;
+  list-style: none;
+  font-weight: 600;
+}
+
+.advanced-summary::-webkit-details-marker {
+  display: none;
+}
+
+.advanced-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.9fr);
+  gap: 18px;
+  padding: 0 18px 18px;
+}
+
+.advanced-editor-panel {
+  min-width: 0;
+}
+
+.panel-header-spaced {
+  margin-top: 20px;
 }
 
 .visual-panel {
@@ -585,11 +700,14 @@ code {
 
   .metric-grid,
   .panel-grid,
-  .engine-grid,
+  .field-layout,
   .results-grid,
   .summary-card-grid,
   .scenario-toolbar,
-  .builder-grid-two {
+  .builder-grid-two,
+  .advanced-grid,
+  .mini-metric-grid,
+  .field-hero {
     grid-template-columns: 1fr;
   }
 

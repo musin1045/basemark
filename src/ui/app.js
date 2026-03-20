@@ -67,6 +67,7 @@ let currentReviewSession = {
 };
 let selectedCandidateId = null;
 let cameraStream = null;
+let placementMode = "none";
 
 function stringify(value) {
   return JSON.stringify(value, null, 2);
@@ -152,20 +153,54 @@ function clearFlash() {
   document.querySelector("#flash-banner").classList.add("is-hidden");
 }
 
+function getPlacementLabel(mode) {
+  if (mode === "anchor") {
+    return "앵커 배치 모드";
+  }
+  if (mode === "observed") {
+    return "관측 요소 배치 모드";
+  }
+  return "배치 모드 없음";
+}
+
+function renderPlacementStatus() {
+  const tag = document.querySelector("#placement-status");
+  if (!tag) {
+    return;
+  }
+
+  tag.textContent = getPlacementLabel(placementMode);
+  tag.classList.toggle("is-active", placementMode !== "none");
+}
+
+function setPlacementMode(mode) {
+  placementMode = mode;
+  renderPlacementStatus();
+}
+
 function renderMetrics(result = null) {
   const scenario = parseScenario();
-  document.querySelector("#metric-anchor-count").textContent = String(
-    scenario.anchors.length
-  );
-  document.querySelector("#metric-checkpoint-count").textContent = String(
-    scenario.checkpoints.length
-  );
-  document.querySelector("#metric-observed-count").textContent = String(
-    scenario.observedElements.length
-  );
-  document.querySelector("#metric-candidate-count").textContent = String(
-    result?.candidates?.length ?? 0
-  );
+  const anchorCount = String(scenario.anchors.length);
+  const checkpointCount = String(scenario.checkpoints.length);
+  const observedCount = String(scenario.observedElements.length);
+  const candidateCount = String(result?.candidates?.length ?? 0);
+
+  document.querySelector("#metric-anchor-count").textContent = anchorCount;
+  document.querySelector("#metric-checkpoint-count").textContent = checkpointCount;
+  document.querySelector("#metric-observed-count").textContent = observedCount;
+  document.querySelector("#metric-candidate-count").textContent = candidateCount;
+  const inlineAnchor = document.querySelector("#metric-anchor-count-inline");
+  const inlineObserved = document.querySelector("#metric-observed-count-inline");
+  const inlineCandidate = document.querySelector("#metric-candidate-count-inline");
+  if (inlineAnchor) {
+    inlineAnchor.textContent = anchorCount;
+  }
+  if (inlineObserved) {
+    inlineObserved.textContent = observedCount;
+  }
+  if (inlineCandidate) {
+    inlineCandidate.textContent = candidateCount;
+  }
   document.querySelector("#scenario-name").textContent =
     getScenarioMetadata().name || scenario.segment.label || scenario.segment.segmentId;
   document.querySelector("#scenario-detail").textContent =
@@ -185,7 +220,7 @@ function setScreen(screenName) {
   }
 
   document.querySelector("#screen-title").textContent =
-    screenName === "engine" ? "Engine" : screenName === "workspace" ? "Ops" : "Home";
+    screenName === "engine" ? "Field" : screenName === "workspace" ? "Ops" : "Home";
 }
 
 function updateScenario(mutator) {
@@ -1039,15 +1074,54 @@ function applyDraggedPoint(kind, index, point) {
   });
   setFlash(
     kind === "anchor"
-      ? `앵커 좌표를 (${point.x}, ${point.y})로 옮겼습니다.`
-      : `관측 요소 좌표를 (${point.x}, ${point.y})로 옮겼습니다.`
+      ? `Anchor moved to (${point.x}, ${point.y}).`
+      : `Observed element moved to (${point.x}, ${point.y}).`
   );
+}
+
+function addAnchorAtPoint(point) {
+  const scenario = updateScenario((draft) => {
+    const anchorIndex = draft.anchors.length + 1;
+    draft.anchors.push({
+      anchorId: `anchor-${anchorIndex}`,
+      segmentId: draft.segment.segmentId,
+      anchorKind: "wall_corner",
+      geometryType: "point",
+      drawingReference: { point: { x: 0, y: 0 } },
+      fieldObservation: { point },
+      stabilityScore: 0.8,
+      visibilityState: "visible"
+    });
+  });
+
+  setPlacementMode("none");
+  renderScenarioValidation(scenario);
+  renderSelectedCandidateDetail(lastRunResult);
+  setFlash(`Added a new anchor at (${point.x}, ${point.y}).`);
+}
+
+function addObservedAtPoint(point) {
+  const scenario = updateScenario((draft) => {
+    const observedIndex = draft.observedElements.length + 1;
+    draft.observedElements.push({
+      elementId: `observed-${observedIndex}`,
+      segmentId: draft.segment.segmentId,
+      elementKind: "switch_box",
+      point
+    });
+  });
+
+  setPlacementMode("none");
+  renderScenarioValidation(scenario);
+  renderSelectedCandidateDetail(lastRunResult);
+  setFlash(`Added a new observed element at (${point.x}, ${point.y}).`);
 }
 
 function renderCanvas({ scenario, result }) {
   if (!window.Konva) {
     document.querySelector("#visual-caption").textContent =
-      "Konva 로딩에 실패해서 시각 오버레이를 표시할 수 없습니다.";
+      "Konva did not load, so the overlay cannot be rendered.";
+    renderPlacementStatus();
     return;
   }
 
@@ -1055,6 +1129,13 @@ function renderCanvas({ scenario, result }) {
   currentStage.destroyChildren();
 
   const layer = new window.Konva.Layer();
+  const background = new window.Konva.Rect({
+    x: 0,
+    y: 0,
+    width: currentStage.width(),
+    height: currentStage.height(),
+    fill: "rgba(251, 248, 242, 0.16)"
+  });
   const rawPoints = [
     ...(scenario.anchors ?? []).map((anchor) => anchor.fieldObservation.point),
     ...(scenario.observedElements ?? []).map((element) => element.point),
@@ -1069,15 +1150,7 @@ function renderCanvas({ scenario, result }) {
     currentStage.height()
   );
 
-  layer.add(
-    new window.Konva.Rect({
-      x: 0,
-      y: 0,
-      width: currentStage.width(),
-      height: currentStage.height(),
-      fill: "rgba(251, 248, 242, 0.16)"
-    })
-  );
+  layer.add(background);
 
   const anchorPoints = (scenario.anchors ?? []).map((anchor, index) => ({
     anchor,
@@ -1219,13 +1292,46 @@ function renderCanvas({ scenario, result }) {
   }
 
   currentStage.add(layer);
+  currentStage.off("click tap");
+  currentStage.on("click tap", (event) => {
+    if (placementMode === "none") {
+      return;
+    }
+
+    if (event.target !== currentStage && event.target !== background) {
+      return;
+    }
+
+    const pointer = currentStage.getPointerPosition();
+    if (!pointer) {
+      return;
+    }
+
+    const nextPoint = projector.invert(pointer);
+    if (placementMode === "anchor") {
+      addAnchorAtPoint(nextPoint);
+      return;
+    }
+
+    if (placementMode === "observed") {
+      addObservedAtPoint(nextPoint);
+    }
+  });
 
   const candidateCount = result?.candidates?.length ?? 0;
   const scenarioName =
     getScenarioMetadata().name || scenario.segment?.label || scenario.segment?.segmentId;
-  document.querySelector("#visual-caption").textContent = result
-    ? `${scenarioName}: ${candidateCount}개 후보를 렌더링했습니다. 후보 카드를 누르면 캔버스에서 해당 위치가 강조됩니다.`
-    : `${scenarioName}: 앵커와 관측 요소를 드래그해서 좌표를 바로 조정할 수 있습니다.`;
+  const baseCaption = result
+    ? `${scenarioName}: rendered ${candidateCount} candidates. Select a card to highlight the same location on the canvas.`
+    : `${scenarioName}: drag anchors and observed elements to refine their positions.`;
+  const placementHint =
+    placementMode === "anchor"
+      ? " Tap an empty area to place a new anchor."
+      : placementMode === "observed"
+        ? " Tap an empty area to place a new observed element."
+        : "";
+  document.querySelector("#visual-caption").textContent = `${baseCaption}${placementHint}`;
+  renderPlacementStatus();
 }
 
 async function runEngine() {
@@ -1284,7 +1390,7 @@ async function listSavedScenarios() {
   root.innerHTML = "";
 
   if (!scenarios.length) {
-    root.innerHTML = "<p>저장된 시나리오가 없습니다.</p>";
+    root.innerHTML = "<p>No saved scenarios yet.</p>";
     return;
   }
 
@@ -1293,18 +1399,28 @@ async function listSavedScenarios() {
     article.className = "saved-scenario-card";
     article.innerHTML = `
       <strong>${scenario.name}</strong>
-      <p>${scenario.description ?? "설명이 없습니다."}</p>
+      <p>${scenario.description ?? "No description available."}</p>
       <p>updated: ${scenario.updatedAt}</p>
-      <button type="button">불러오기</button>
+      <button type="button">Load</button>
     `;
 
     article.querySelector("button").addEventListener("click", async () => {
-      const showResponse = await fetch(
-        `/api/engine/scenario/show?scenarioId=${encodeURIComponent(scenario.id)}`
-      );
-      const entry = await showResponse.json();
+      const entry = isLocalShellMode()
+        ? readLibrary(SCENARIO_LIBRARY_KEY, []).find((item) => item.id === scenario.id)
+        : await (async () => {
+            const showResponse = await fetch(
+              `/api/engine/scenario/show?scenarioId=${encodeURIComponent(scenario.id)}`
+            );
+            return showResponse.json();
+          })();
+
+      if (!entry) {
+        setFlash("Could not find the selected scenario.", true);
+        return;
+      }
+
       applySavedScenario(entry);
-      setFlash(`시나리오 ${entry.name}을 불러왔습니다.`);
+      setFlash(`Loaded scenario ${entry.name}.`);
     });
 
     root.appendChild(article);
@@ -1415,13 +1531,13 @@ function resetOutputPanels() {
   selectedCandidateId = null;
   document.querySelector("#output").textContent = "No output yet.";
   document.querySelector("#candidate-cards").innerHTML =
-    '<p class="empty-state">아직 후보 출력이 없습니다.</p>';
+    '<p class="empty-state">No candidate output yet.</p>';
   document.querySelector("#projected-checkpoints").innerHTML =
-    "<p>아직 투영된 체크포인트가 없습니다.</p>";
+    "<p>No projected checkpoints yet.</p>";
   document.querySelector("#review-summary").innerHTML =
-    "<p>아직 검토 요약이 없습니다.</p>";
+    "<p>No review summary yet.</p>";
   document.querySelector("#engine-summary").innerHTML =
-    "<p>엔진을 실행하면 정합 결과와 후보가 여기에 표시됩니다.</p>";
+    "<p>Run the engine to inspect alignment and candidate output.</p>";
   document.querySelector("#metric-candidate-count").textContent = "0";
   const detail = document.querySelector("#candidate-detail");
   if (detail) {
@@ -1434,7 +1550,7 @@ function bindEvents() {
   for (const button of document.querySelectorAll("[data-screen-target]")) {
     button.addEventListener("click", () => {
       setScreen(button.dataset.screenTarget);
-      renderCanvas({ scenario: parseScenario(), result: null });
+      renderCanvas({ scenario: parseScenario(), result: lastRunResult });
     });
   }
 
@@ -1446,7 +1562,7 @@ function bindEvents() {
       renderFormBuilder();
       renderScenarioValidation(scenario);
       renderSelectedCandidateDetail(lastRunResult);
-      renderCanvas({ scenario, result: null });
+      renderCanvas({ scenario, result: lastRunResult });
       clearFlash();
     } catch {
       document.querySelector("#engine-status").textContent = "Draft";
@@ -1462,7 +1578,7 @@ function bindEvents() {
       saveScenario();
       renderMetrics();
       renderScenarioValidation(parseScenario());
-      renderCanvas({ scenario: parseScenario(), result: null });
+      renderCanvas({ scenario: parseScenario(), result: lastRunResult });
     });
   }
 
@@ -1485,7 +1601,7 @@ function bindEvents() {
     .addEventListener("click", async () => {
       try {
         await startCamera();
-        setFlash("Camera started. Overlay is now drawn over the live feed.");
+        setFlash("Camera started. The overlay is now shown on the live feed.");
       } catch (error) {
         setFlash(error.message, true);
       }
@@ -1510,6 +1626,30 @@ function bindEvents() {
     });
 
   document
+    .querySelector("[data-action='place-anchor']")
+    .addEventListener("click", () => {
+      setPlacementMode("anchor");
+      renderCanvas({ scenario: parseScenario(), result: lastRunResult });
+      setFlash("Tap an empty area to place a new anchor.");
+    });
+
+  document
+    .querySelector("[data-action='place-observed']")
+    .addEventListener("click", () => {
+      setPlacementMode("observed");
+      renderCanvas({ scenario: parseScenario(), result: lastRunResult });
+      setFlash("Tap an empty area to place a new observed element.");
+    });
+
+  document
+    .querySelector("[data-action='cancel-placement']")
+    .addEventListener("click", () => {
+      setPlacementMode("none");
+      renderCanvas({ scenario: parseScenario(), result: lastRunResult });
+      setFlash("Placement mode cleared.");
+    });
+
+  document
     .querySelector("[data-action='reset-scenario']")
     .addEventListener("click", () => {
       document.querySelector("#scenario-id-input").value = "door-left-wall";
@@ -1521,39 +1661,44 @@ function bindEvents() {
         scenarioId: "door-left-wall",
         reviews: []
       };
+      setPlacementMode("none");
       resetOutputPanels();
-      setFlash("기본 시나리오로 초기화했습니다.");
+      setFlash("Reset to the default scenario.");
     });
 
   document
     .querySelector("[data-action='format-scenario']")
     .addEventListener("click", () => {
       applyScenario(parseScenario());
-      setFlash("시나리오 JSON 형식을 정리했습니다.");
+      setPlacementMode("none");
+      setFlash("Formatted the scenario JSON.");
     });
 
   document
     .querySelector("[data-action='load-missing-example']")
     .addEventListener("click", () => {
       applyScenario(createMissingExample());
+      setPlacementMode("none");
       resetOutputPanels();
-      setFlash("missing 예제를 불러왔습니다.");
+      setFlash("Loaded the missing example.");
     });
 
   document
     .querySelector("[data-action='load-position-example']")
     .addEventListener("click", () => {
       applyScenario(createPositionExample());
+      setPlacementMode("none");
       resetOutputPanels();
-      setFlash("position_diff 예제를 불러왔습니다.");
+      setFlash("Loaded the position_diff example.");
     });
 
   document
     .querySelector("[data-action='load-extra-example']")
     .addEventListener("click", () => {
       applyScenario(createExtraExample());
+      setPlacementMode("none");
       resetOutputPanels();
-      setFlash("extra 예제를 불러왔습니다.");
+      setFlash("Loaded the extra example.");
     });
 
   document.querySelector("[data-action='add-anchor']").addEventListener("click", () => {
@@ -1569,7 +1714,7 @@ function bindEvents() {
         visibilityState: "visible"
       });
     });
-    setFlash("앵커를 추가했습니다.");
+    setFlash("Added a new anchor.");
   });
 
   document
@@ -1592,7 +1737,7 @@ function bindEvents() {
           semanticExpectation: "switch_box"
         });
       });
-      setFlash("체크포인트를 추가했습니다.");
+      setFlash("Added a new checkpoint.");
     });
 
   document
@@ -1606,22 +1751,23 @@ function bindEvents() {
           point: { x: 200, y: 120 }
         });
       });
-      setFlash("관측 요소를 추가했습니다.");
+      setFlash("Added a new observed element.");
     });
 
   document
     .querySelector("[data-action='clear-output']")
     .addEventListener("click", () => {
       lastRunResult = null;
+      setPlacementMode("none");
       resetOutputPanels();
       renderCanvas({ scenario: parseScenario(), result: null });
-      setFlash("엔진 출력과 후보 카드를 비웠습니다.");
+      setFlash("Cleared engine output and candidate cards.");
     });
 
   for (const button of document.querySelectorAll("[data-action='list-scenarios']")) {
     button.addEventListener("click", async () => {
       await listSavedScenarios();
-      setFlash("저장된 시나리오 목록을 새로고침했습니다.");
+      setFlash("Refreshed the saved scenario list.");
     });
   }
 
@@ -1652,6 +1798,7 @@ function init() {
   document.querySelector("#scenario-description-input").value =
     saved.metadata.description;
   document.querySelector("#engine-scenario-input").value = saved.scenarioText;
+  renderPlacementStatus();
   renderScenarioValidation(parseScenario());
   renderMetrics();
   resetOutputPanels();
