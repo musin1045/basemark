@@ -11,41 +11,42 @@
       <aside class="sidebar">
         <div class="brand-block">
           <p class="eyebrow">BaseMark</p>
-          <h1>현장 비교 앱</h1>
+          <h1>현장 비교</h1>
           <p class="brand-copy">
-            도면을 기준으로 현장 사진을 비교해서,
-            빠진 것과 어긋난 것을 후보로 보여주는 앱입니다.
+            도면 기준으로 사진을 맞추고, 사람이 검토할 후보만 간단하게 보여줍니다.
           </p>
         </div>
 
         <nav class="nav-stack">
-          <button class="nav-button is-active" data-screen-target="home">시작</button>
+          <button class="nav-button is-active" data-screen-target="home">소개</button>
           <button class="nav-button" data-screen-target="engine">현장 비교</button>
           <button class="nav-button" data-screen-target="workspace">운영</button>
         </nav>
 
-        <section class="sidebar-card">
-          <p class="sidebar-label">현재 상태</p>
-          <strong id="engine-status">Idle</strong>
-          <span id="engine-status-detail">No run yet</span>
-        </section>
+        <div class="sidebar-status">
+          <section class="sidebar-card compact-card">
+            <p class="sidebar-label">엔진 상태</p>
+            <strong id="engine-status">Idle</strong>
+            <span id="engine-status-detail">No run yet</span>
+          </section>
 
-        <section class="sidebar-card">
-          <p class="sidebar-label">현재 구간</p>
-          <strong id="scenario-name">Door Left Wall</strong>
-          <span id="scenario-detail">Editable local draft</span>
-        </section>
+          <section class="sidebar-card compact-card">
+            <p class="sidebar-label">현재 구간</p>
+            <strong id="scenario-name">Door Left Wall</strong>
+            <span id="scenario-detail">Editable local draft</span>
+          </section>
+        </div>
       </aside>
 
       <section class="main-shell">
         <header class="topbar">
           <div>
             <p class="topbar-kicker">Local Field Comparison</p>
-            <h2 id="screen-title">시작</h2>
+            <h2 id="screen-title">소개</h2>
           </div>
           <div class="topbar-actions">
             <button data-action="run-engine">후보 찾기</button>
-            <button data-action="reset-scenario">처음 상태로</button>
+            <button data-action="reset-scenario">초기화</button>
           </div>
         </header>
 
@@ -53,97 +54,138 @@
 
         <section class="screen-stack">
           <section class="screen is-active" data-screen="home">
-            <div class="hero-panel">
+            <section class="hero-panel hero-simple">
               <p class="eyebrow">한 줄 설명</p>
-              <h3>BaseMark는 사진을 해석하는 AI가 아니라, 기준점을 잡아서 비교 후보를 계산하는 도구입니다.</h3>
+              <h3>BaseMark는 사진을 “이해”하려는 앱이 아니라, 기준점을 잡아 비교 후보를 계산하는 앱입니다.</h3>
               <p>
-                먼저 현장의 변하지 않는 구조를 기준으로 잡고, 그 기준으로 예상 위치를 계산한 뒤,
-                사람이 확인할 후보를 보여줍니다.
+                먼저 현장에서 잘 안 바뀌는 구조 기준점 두 개를 잡습니다. 그 기준으로 예상 위치를 계산한 뒤,
+                빠짐, 추가, 위치 차이를 후보로 보여주고 사람이 최종 확인합니다.
               </p>
-            </div>
+            </section>
 
             <div class="metric-grid">
               <article class="metric-card">
-                <span class="metric-label">앵커</span>
+                <span class="metric-label">기준점</span>
                 <strong id="metric-anchor-count">0</strong>
-                <span class="metric-meta">기준으로 잡은 구조점</span>
+                <span class="metric-meta">비교의 기준이 되는 구조점</span>
               </article>
               <article class="metric-card">
                 <span class="metric-label">체크포인트</span>
                 <strong id="metric-checkpoint-count">0</strong>
-                <span class="metric-meta">있어야 할 예상 위치</span>
+                <span class="metric-meta">도면 기준으로 예상되는 위치</span>
               </article>
               <article class="metric-card">
                 <span class="metric-label">관측 요소</span>
                 <strong id="metric-observed-count">0</strong>
-                <span class="metric-meta">현장에서 실제 보이는 것</span>
+                <span class="metric-meta">사진에서 실제로 보이는 대상</span>
               </article>
               <article class="metric-card">
                 <span class="metric-label">후보</span>
                 <strong id="metric-candidate-count">0</strong>
-                <span class="metric-meta">마지막 실행 결과</span>
+                <span class="metric-meta">사람이 확인할 결과</span>
               </article>
             </div>
 
-            <div class="panel-grid">
+            <div class="panel-grid compact-grid">
               <section class="panel">
                 <div class="panel-header">
-                  <h3>앵커란?</h3>
+                  <h3>기준점이란</h3>
                 </div>
                 <p class="panel-copy">
-                  앵커는 비교의 기준이 되는 구조점입니다.
-                  예를 들면 문틀 모서리, 벽 코너, 창틀 끝점 같은 “잘 안 바뀌는 위치”입니다.
+                  문틀 끝, 창호 바깥 프레임 모서리, 벽 코너처럼 잘 안 바뀌는 구조점입니다.
+                  아무 점이 아니라 “역할이 있는 점”이어야 합니다.
                 </p>
               </section>
 
               <section class="panel">
                 <div class="panel-header">
-                  <h3>체크포인트란?</h3>
+                  <h3>비율이란</h3>
                 </div>
                 <p class="panel-copy">
-                  체크포인트는 “이쯤에 있어야 한다”는 예상 위치입니다.
-                  절대 좌표가 아니라, 앵커 사이 비율로 정의됩니다.
+                  절대 픽셀이 아니라 기준점 두 개 사이의 가로 비율과 세로 오프셋으로 위치를 표현합니다.
+                  그래서 사진 크기와 각도가 달라도 비교 기준을 유지할 수 있습니다.
                 </p>
               </section>
 
               <section class="panel">
                 <div class="panel-header">
-                  <h3>관측 요소란?</h3>
+                  <h3>결과란</h3>
                 </div>
                 <p class="panel-copy">
-                  관측 요소는 현장 사진에서 실제로 보이는 대상입니다.
-                  스위치 박스, 콘센트 박스, 마감 포인트처럼 비교 대상이 되는 요소입니다.
-                </p>
-              </section>
-
-              <section class="panel">
-                <div class="panel-header">
-                  <h3>후보란?</h3>
-                </div>
-                <p class="panel-copy">
-                  최종 판정이 아니라, 사람이 검토할 항목입니다.
-                  <code>missing</code>, <code>extra</code>, <code>position_diff</code>로 나뉩니다.
+                  <code>missing</code>, <code>extra</code>, <code>position_diff</code> 세 종류만 보여줍니다.
+                  BaseMark는 자동 확정이 아니라 검토 후보 생성까지 맡습니다.
                 </p>
               </section>
             </div>
           </section>
 
           <section class="screen" data-screen="engine">
-            <section class="field-hero panel">
-              <div class="field-hero-copy">
-                <p class="eyebrow">현장 비교</p>
-                <h3>왼쪽에서 맞추고, 오른쪽에서 검토합니다.</h3>
-                <p class="panel-copy">
-                  1. 사진이나 카메라 화면 위에 앵커와 관측 요소를 맞춥니다.
-                  2. 엔진이 후보를 계산합니다.
-                  3. 오른쪽에서 후보를 확인하고 확정합니다.
-                </p>
+            <section class="panel feed-card">
+              <div class="feed-header">
+                <div>
+                  <p class="eyebrow">현장 비교</p>
+                  <h3>사진 한 장에서 기준점을 잡고, 보이는 대상을 찍고, 후보를 찾습니다.</h3>
+                  <p class="panel-copy">
+                    이 화면만 보면 됩니다. 나머지 세부 JSON과 폼은 아래 고급 편집기로 접어 두었습니다.
+                  </p>
+                </div>
+                <div class="field-hero-actions">
+                  <button type="button" data-action="start-camera">카메라 켜기</button>
+                  <button type="button" data-action="capture-camera">프레임 고정</button>
+                  <button type="button" data-action="stop-camera">카메라 끄기</button>
+                  <button type="button" data-action="run-engine">후보 찾기</button>
+                </div>
               </div>
-              <div class="field-hero-actions">
-                <button type="button" data-action="start-camera">카메라 켜기</button>
-                <button type="button" data-action="capture-camera">사진 고정</button>
-                <button type="button" data-action="stop-camera">카메라 끄기</button>
-                <button type="button" data-action="run-engine">후보 찾기</button>
+
+              <div class="step-strip">
+                <div class="step-chip" data-step-chip="anchors">1. 기준점 잡기</div>
+                <div class="step-chip" data-step-chip="observed">2. 보이는 대상 찍기</div>
+                <div class="step-chip" data-step-chip="run">3. 후보 확인</div>
+              </div>
+
+              <div class="preset-toolbar">
+                <span class="toolbar-label">기준점 역할 선택</span>
+                <button type="button" class="preset-chip" data-anchor-preset="window_left_top">창호 좌상단</button>
+                <button type="button" class="preset-chip" data-anchor-preset="window_right_top">창호 우상단</button>
+                <button type="button" class="preset-chip" data-anchor-preset="window_left_bottom">창호 좌하단</button>
+                <button type="button" class="preset-chip" data-anchor-preset="window_right_bottom">창호 우하단</button>
+                <button type="button" class="preset-chip" data-anchor-preset="wall_left_corner">벽 좌측 모서리</button>
+                <button type="button" class="preset-chip" data-anchor-preset="wall_right_corner">벽 우측 모서리</button>
+              </div>
+
+              <p id="anchor-preset-help" class="preset-help">
+                먼저 기준점 역할을 고르세요. 예를 들어 창호를 기준으로 보면, 창호 바깥 프레임의 모서리를 찍어야 합니다.
+              </p>
+
+              <div class="placement-toolbar">
+                <button type="button" data-action="place-anchor" data-placement-mode="anchor">선택한 기준점 찍기</button>
+                <button type="button" data-action="place-observed" data-placement-mode="observed">보이는 대상 찍기</button>
+                <button type="button" data-action="cancel-placement">취소</button>
+                <span id="placement-status" class="tag placement-tag">배치 모드 없음</span>
+              </div>
+
+              <section class="field-guide-card" aria-live="polite">
+                <p class="field-guide-kicker">지금 해야 할 일</p>
+                <h4 id="field-guide-title">먼저 기준점 두 개를 잡으세요.</h4>
+                <p id="field-guide-body">
+                  같은 구조선 위의 두 점을 잡아야 합니다. 예를 들어 창호를 기준으로 본다면
+                  “창호 바깥 프레임 좌상단 + 우상단”처럼 같은 프레임 기준으로 짝을 맞추세요.
+                </p>
+              </section>
+
+              <div class="quick-guide-row">
+                <article class="mini-guide-card">
+                  <strong>어디를 클릭하나</strong>
+                  <p>움직이는 창짝이 아니라, 고정된 바깥 프레임 모서리나 벽 코너를 클릭합니다.</p>
+                </article>
+                <article class="mini-guide-card">
+                  <strong>어떻게 짝을 맞추나</strong>
+                  <p>좌상단과 우상단처럼 같은 선, 같은 구조에서 두 점을 잡아야 비율이 의미를 가집니다.</p>
+                </article>
+                <article class="mini-guide-card">
+                  <strong>비율은 어디서 보나</strong>
+                  <p>오른쪽의 “비율 기준” 카드에서 anchor basis, spanRatio, heightRatio를 바로 봅니다.</p>
+                </article>
               </div>
             </section>
 
@@ -151,56 +193,16 @@
               <section class="panel visual-panel visual-panel-primary">
                 <div class="panel-header">
                   <h3>현장 화면</h3>
-                  <span class="tag">사진 + 후보</span>
-                </div>
-                <p class="panel-copy">
-                  이 화면에서 현장 이미지, 앵커, 관측 요소, 예상 위치, 후보를 한 번에 봅니다.
-                </p>
-
-                <div class="step-strip">
-                  <div class="step-chip" data-step-chip="anchors">1. 기준점(앵커) 잡기</div>
-                  <div class="step-chip" data-step-chip="observed">2. 보이는 대상 찍기</div>
-                  <div class="step-chip" data-step-chip="run">3. 후보 찾기</div>
-                </div>
-
-                <div class="placement-toolbar">
-                  <button type="button" data-action="place-anchor" data-placement-mode="anchor">기준점(앵커) 찍기</button>
-                  <button type="button" data-action="place-observed" data-placement-mode="observed">보이는 대상 찍기</button>
-                  <button type="button" data-action="cancel-placement">선택 취소</button>
-                  <span id="placement-status" class="tag placement-tag">배치 모드 없음</span>
-                </div>
-
-                <section class="field-guide-card" aria-live="polite">
-                  <p class="field-guide-kicker">지금 해야 할 일</p>
-                  <h4 id="field-guide-title">먼저 기준점 2개를 잡으세요.</h4>
-                  <p id="field-guide-body">
-                    기준점은 문틀 끝이나 벽 모서리처럼 잘 안 바뀌는 위치입니다.
-                    먼저 왼쪽 기준점 하나, 그다음 오른쪽 기준점 하나를 잡으면 됩니다.
-                  </p>
-                </section>
-
-                <div class="concept-grid">
-                  <article class="concept-card">
-                    <strong>기준점(앵커)</strong>
-                    <p>문틀 끝, 벽 모서리처럼 잘 안 바뀌는 위치입니다.</p>
-                  </article>
-                  <article class="concept-card">
-                    <strong>예상 위치(체크포인트)</strong>
-                    <p>도면 기준으로 계산된 “이쯤에 있어야 하는 곳”입니다.</p>
-                  </article>
-                  <article class="concept-card">
-                    <strong>보이는 대상(관측 요소)</strong>
-                    <p>현장 사진에서 실제로 보이는 스위치, 박스, 포인트입니다.</p>
-                  </article>
+                  <span class="tag">사진 + 오버레이</span>
                 </div>
 
                 <div class="canvas-legend">
                   <span class="legend-item legend-anchor">기준점</span>
                   <span class="legend-item legend-checkpoint">예상 위치</span>
                   <span class="legend-item legend-observed">보이는 대상</span>
-                  <span class="legend-item legend-missing">없음 후보</span>
-                  <span class="legend-item legend-position">위치 차이</span>
-                  <span class="legend-item legend-extra">추가 후보</span>
+                  <span class="legend-item legend-missing">missing</span>
+                  <span class="legend-item legend-position">position_diff</span>
+                  <span class="legend-item legend-extra">extra</span>
                 </div>
 
                 <div class="canvas-frame">
@@ -212,7 +214,7 @@
                 </div>
 
                 <div id="visual-caption" class="visual-caption">
-                  시나리오를 수정하거나 엔진을 실행하면 화면이 갱신됩니다.
+                  기준점을 움직여 위치를 다듬고, 보이는 대상을 찍은 뒤 후보 찾기를 누르세요.
                 </div>
               </section>
 
@@ -223,7 +225,7 @@
                   </div>
                   <div class="mini-metric-grid">
                     <article class="mini-metric-card">
-                      <span>앵커</span>
+                      <span>기준점</span>
                       <strong id="metric-anchor-count-inline">0</strong>
                     </article>
                     <article class="mini-metric-card">
@@ -236,7 +238,16 @@
                     </article>
                   </div>
                   <div id="engine-summary" class="summary-stack">
-                    <p>후보 찾기를 누르면 결과가 여기에 요약됩니다.</p>
+                    <p>후보 찾기를 누르면 정합 결과와 후보 수가 여기에 정리됩니다.</p>
+                  </div>
+                </section>
+
+                <section class="panel quick-panel">
+                  <div class="panel-header">
+                    <h3>비율 기준</h3>
+                  </div>
+                  <div id="ratio-summary" class="summary-stack">
+                    <p>기준점 두 개를 잡으면 체크포인트 기준 비율이 여기에 보입니다.</p>
                   </div>
                 </section>
 
@@ -245,7 +256,7 @@
                     <h3>선택한 후보</h3>
                   </div>
                   <div id="candidate-detail" class="summary-stack">
-                    <p>오른쪽 후보 카드 하나를 누르면 자세한 근거가 여기 보입니다.</p>
+                    <p>후보 카드를 누르면 근거와 좌표가 여기에 보입니다.</p>
                   </div>
                 </section>
 
@@ -263,64 +274,38 @@
               </section>
             </div>
 
-            <div class="results-grid">
-              <section class="panel result-panel">
-                <div class="panel-header">
-                  <h3>예상 위치</h3>
-                </div>
-                <div id="projected-checkpoints" class="summary-stack">
-                  <p>아직 예상 위치가 없습니다.</p>
-                </div>
-              </section>
-
-              <section class="panel result-panel">
-                <div class="panel-header">
-                  <h3>입력 점검</h3>
-                </div>
-                <div id="validation-summary" class="summary-stack">
-                  <p>입력 점검 결과가 여기에 표시됩니다.</p>
-                </div>
-              </section>
-            </div>
-
-            <div class="results-grid">
-              <section class="panel result-panel">
-                <div class="panel-header">
-                  <h3>작동 순서</h3>
-                </div>
-                <ol class="plain-list workflow-list">
-                  <li>앵커 2개 이상을 잡습니다.</li>
-                  <li>관측 요소를 맞춥니다.</li>
-                  <li>후보 찾기를 누릅니다.</li>
-                  <li>오른쪽 후보 카드에서 확정, 반려, 보류를 정합니다.</li>
-                </ol>
-              </section>
-
-              <section class="panel result-panel">
-                <div class="panel-header">
-                  <h3>저장된 시나리오</h3>
-                  <button data-action="list-scenarios">새로고침</button>
-                </div>
-                <div id="scenario-list" class="summary-stack">
-                  <p>No saved scenarios yet.</p>
-                </div>
-              </section>
-            </div>
-
             <details class="panel advanced-panel">
               <summary class="advanced-summary">
                 <span>고급 편집기</span>
-                <span class="tag">Scenario + JSON</span>
+                <span class="tag">폼 + JSON + 검증</span>
               </summary>
 
               <div class="advanced-grid">
+                <section class="panel result-panel">
+                  <div class="panel-header">
+                    <h3>예상 위치</h3>
+                  </div>
+                  <div id="projected-checkpoints" class="summary-stack">
+                    <p>아직 예상 위치가 없습니다.</p>
+                  </div>
+                </section>
+
+                <section class="panel result-panel">
+                  <div class="panel-header">
+                    <h3>입력 점검</h3>
+                  </div>
+                  <div id="validation-summary" class="summary-stack">
+                    <p>입력 점검 결과가 여기에 표시됩니다.</p>
+                  </div>
+                </section>
+
                 <section class="panel editor-panel advanced-editor-panel">
                   <div class="panel-header">
-                    <h3>세부 입력</h3>
+                    <h3>시나리오 입력</h3>
                     <button data-action="format-scenario">정리</button>
                   </div>
                   <p class="panel-copy">
-                    여기서는 구간, 앵커, 체크포인트, 관측 요소를 자세히 수정합니다.
+                    구간, 기준점, 체크포인트, 관측 요소를 자세히 수정하는 영역입니다.
                   </p>
 
                   <div class="scenario-toolbar">
@@ -334,9 +319,9 @@
                   </label>
 
                   <div class="guide-strip">
-                    <span class="guide-item">구간: 비교하려는 벽면 또는 부분</span>
-                    <span class="guide-item">앵커: 기준 구조점</span>
-                    <span class="guide-item">체크포인트: 있어야 할 예상 위치</span>
+                    <span class="guide-item">구간: 지금 비교하려는 부분</span>
+                    <span class="guide-item">기준점: 구조 기준이 되는 점</span>
+                    <span class="guide-item">체크포인트: 도면 기준 예상 위치</span>
                   </div>
 
                   <section class="builder-stack">
@@ -362,8 +347,8 @@
 
                     <article class="builder-section">
                       <div class="panel-header">
-                        <h4>앵커</h4>
-                        <button type="button" data-action="add-anchor">앵커 추가</button>
+                        <h4>기준점</h4>
+                        <button type="button" data-action="add-anchor">기준점 추가</button>
                       </div>
                       <div id="anchor-form-list" class="stack-list"></div>
                     </article>
@@ -390,15 +375,15 @@
                   <div class="panel-header panel-header-spaced">
                     <div>
                       <h3>원본 JSON</h3>
-                      <p class="panel-copy">고급 수정이 필요할 때만 직접 만지면 됩니다.</p>
+                      <p class="panel-copy">필요할 때만 직접 수정하는 고급 영역입니다.</p>
                     </div>
                     <div class="editor-actions">
-                      <button data-action="load-missing-example">Missing 예제</button>
-                      <button data-action="load-position-example">Position 예제</button>
-                      <button data-action="load-extra-example">Extra 예제</button>
+                      <button data-action="load-missing-example">Missing 예시</button>
+                      <button data-action="load-position-example">Position 예시</button>
+                      <button data-action="load-extra-example">Extra 예시</button>
                       <button data-action="save-scenario">저장</button>
                       <button data-action="list-scenarios">목록</button>
-                      <button data-action="clear-output">출력 비우기</button>
+                      <button data-action="clear-output">출력 지우기</button>
                     </div>
                   </div>
 
@@ -411,16 +396,26 @@
                 </section>
               </div>
             </details>
+
+            <section class="panel saved-panel">
+              <div class="panel-header">
+                <h3>저장된 시나리오</h3>
+                <button data-action="list-scenarios">새로고침</button>
+              </div>
+              <div id="scenario-list" class="summary-stack">
+                <p>No saved scenarios yet.</p>
+              </div>
+            </section>
           </section>
 
           <section class="screen" data-screen="workspace">
-            <div class="panel-grid">
+            <div class="panel-grid compact-grid">
               <section class="panel">
                 <div class="panel-header">
                   <h3>로컬 저장</h3>
                 </div>
                 <p class="panel-copy">
-                  시나리오 초안, 저장된 시나리오, 후보 검토 결과는 로컬 우선으로 유지됩니다.
+                  시나리오 초안, 저장된 시나리오, 후보 검토 결과를 로컬 우선으로 보관합니다.
                 </p>
               </section>
 
@@ -431,7 +426,7 @@
                 <ol class="plain-list">
                   <li>체크포인트도 캔버스에서 직접 조정하기</li>
                   <li>실제 도면 1장과 사진 1세트로 반복 테스트하기</li>
-                  <li>안드로이드 현장용 화면 더 단순화하기</li>
+                  <li>안드로이드 현장 화면을 더 단순화하기</li>
                 </ol>
               </section>
             </div>

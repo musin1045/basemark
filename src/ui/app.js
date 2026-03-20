@@ -5,6 +5,44 @@ const SCENARIO_LIBRARY_KEY = "basemark.engine.scenario.library.v1";
 const REVIEW_LIBRARY_KEY = "basemark.engine.review.library.v1";
 const CANVAS_WIDTH = 760;
 const CANVAS_HEIGHT = 520;
+const ANCHOR_PRESETS = {
+  window_left_top: {
+    label: "창호 좌상단",
+    anchorKind: "window_frame_left_top",
+    idPrefix: "window-left-top",
+    help: "창호 바깥 프레임의 왼쪽 위 꼭짓점을 누르세요."
+  },
+  window_right_top: {
+    label: "창호 우상단",
+    anchorKind: "window_frame_right_top",
+    idPrefix: "window-right-top",
+    help: "창호 바깥 프레임의 오른쪽 위 꼭짓점을 누르세요."
+  },
+  window_left_bottom: {
+    label: "창호 좌하단",
+    anchorKind: "window_frame_left_bottom",
+    idPrefix: "window-left-bottom",
+    help: "창호 바깥 프레임의 왼쪽 아래 꼭짓점을 누르세요."
+  },
+  window_right_bottom: {
+    label: "창호 우하단",
+    anchorKind: "window_frame_right_bottom",
+    idPrefix: "window-right-bottom",
+    help: "창호 바깥 프레임의 오른쪽 아래 꼭짓점을 누르세요."
+  },
+  wall_left_corner: {
+    label: "벽 좌측 모서리",
+    anchorKind: "wall_left_corner",
+    idPrefix: "wall-left-corner",
+    help: "비교 구간에서 왼쪽 끝 벽 모서리를 누르세요."
+  },
+  wall_right_corner: {
+    label: "벽 우측 모서리",
+    anchorKind: "wall_right_corner",
+    idPrefix: "wall-right-corner",
+    help: "비교 구간에서 오른쪽 끝 벽 모서리를 누르세요."
+  }
+};
 
 const defaultScenario = {
   segment: {
@@ -69,6 +107,7 @@ let selectedCandidateId = null;
 let cameraStream = null;
 let placementMode = "none";
 let selectedBuilderEntity = null;
+let selectedAnchorPreset = "window_left_top";
 
 function stringify(value) {
   return JSON.stringify(value, null, 2);
@@ -156,10 +195,10 @@ function clearFlash() {
 
 function getPlacementLabel(mode) {
   if (mode === "anchor") {
-    return "앵커 배치 모드";
+    return "기준점 배치 중";
   }
   if (mode === "observed") {
-    return "관측 요소 배치 모드";
+    return "관측 요소 배치 중";
   }
   return "배치 모드 없음";
 }
@@ -183,6 +222,51 @@ function renderPlacementStatus() {
   }
 }
 
+function getSelectedAnchorPreset() {
+  return ANCHOR_PRESETS[selectedAnchorPreset] ?? ANCHOR_PRESETS.window_left_top;
+}
+
+function renderAnchorPresetUI() {
+  for (const button of document.querySelectorAll("[data-anchor-preset]")) {
+    button.classList.toggle("is-active", button.dataset.anchorPreset === selectedAnchorPreset);
+  }
+
+  const help = document.querySelector("#anchor-preset-help");
+  if (!help) {
+    return;
+  }
+
+  const preset = getSelectedAnchorPreset();
+  help.textContent = `선택된 기준점: ${preset.label}. ${preset.help}`;
+}
+
+function renderRatioSummary(scenario = parseScenario()) {
+  const root = document.querySelector("#ratio-summary");
+  if (!root) {
+    return;
+  }
+
+  root.innerHTML = "";
+
+  if (!scenario.checkpoints?.length) {
+    root.innerHTML = "<p>체크포인트가 아직 없습니다. 체크포인트를 추가하면 기준 비율이 여기에 표시됩니다.</p>";
+    return;
+  }
+
+  for (const checkpoint of scenario.checkpoints) {
+    const article = document.createElement("article");
+    article.className = "checkpoint-card";
+    article.innerHTML = `
+      <strong>${checkpoint.checkpointId}</strong>
+      <p>기준점 쌍: ${(checkpoint.anchorBasis ?? []).join(" -> ") || "없음"}</p>
+      <p>가로 비율(spanRatio): ${checkpoint.normalizedPosition?.spanRatio ?? "n/a"}</p>
+      <p>세로 비율(heightRatio): ${checkpoint.normalizedPosition?.heightRatio ?? "n/a"}</p>
+      <p>기대 요소: ${checkpoint.semanticExpectation ?? "n/a"}</p>
+    `;
+    root.appendChild(article);
+  }
+}
+
 function renderFieldGuide(scenario = parseScenario()) {
   const title = document.querySelector("#field-guide-title");
   const body = document.querySelector("#field-guide-body");
@@ -192,48 +276,41 @@ function renderFieldGuide(scenario = parseScenario()) {
 
   const anchorCount = scenario.anchors?.length ?? 0;
   const observedCount = scenario.observedElements?.length ?? 0;
+  const preset = getSelectedAnchorPreset();
   let activeStep = "anchors";
 
   if (placementMode === "anchor") {
     activeStep = "anchors";
     if (anchorCount === 0) {
       title.textContent = "첫 번째 기준점을 찍으세요.";
-      body.textContent =
-        "기준점은 문틀 끝이나 벽 모서리처럼 잘 안 바뀌는 위치입니다. 사진에서 가장 잘 보이는 기준점 하나를 누르세요.";
+      body.textContent = `${preset.label} 기준점을 잡는 단계입니다. ${preset.help} 같은 구조에서 두 번째 기준점도 이어서 잡아야 비율이 의미를 가집니다.`;
     } else if (anchorCount === 1) {
       title.textContent = "두 번째 기준점을 찍으세요.";
-      body.textContent =
-        "첫 번째 기준점과 떨어진 다른 기준점을 찍으세요. 기준점이 두 개 있어야 도면 기준을 현장에 맞출 수 있습니다.";
+      body.textContent = `첫 번째 기준점과 같은 구조선에 있는 짝을 찍어야 합니다. 예를 들어 좌상단을 찍었다면 같은 프레임의 우상단을 찍는 식으로 맞추세요. ${preset.help}`;
     } else {
-      title.textContent = "새 기준점을 추가하는 중입니다.";
-      body.textContent =
-        "이미 기준점이 충분히 있으면 더 찍지 않아도 됩니다. 꼭 필요한 추가 기준점이 있을 때만 누르세요.";
+      title.textContent = "기준점은 충분합니다.";
+      body.textContent = "이제 사진에서 실제로 보이는 대상만 찍으면 됩니다. 스위치 박스나 노출된 박스처럼 비교할 대상을 표시하세요.";
     }
   } else if (placementMode === "observed") {
     activeStep = "observed";
-    title.textContent = "현장에서 실제로 보이는 대상을 찍으세요.";
-    body.textContent =
-      "예를 들면 스위치 박스, 콘센트 박스, 노출된 포인트처럼 사진에서 실제로 확인되는 대상을 누르면 됩니다.";
+    title.textContent = "보이는 대상을 찍으세요.";
+    body.textContent = "사진에서 실제로 보이는 스위치, 박스, 마감 요소를 찍습니다. 기준점과 다르게 움직일 수 있는 대상이어도 괜찮습니다.";
   } else if (anchorCount < 2) {
     activeStep = "anchors";
-    title.textContent = "먼저 기준점 2개를 잡으세요.";
-    body.textContent =
-      "기준점은 문틀 끝이나 벽 모서리처럼 잘 안 바뀌는 위치입니다. 왼쪽 하나, 오른쪽 하나처럼 서로 떨어진 두 점을 먼저 잡으세요.";
+    title.textContent = "먼저 기준점 두 개를 잡으세요.";
+    body.textContent = "문틀 끝, 창호 바깥 프레임 모서리, 벽 코너처럼 잘 안 바뀌는 구조점을 고르세요. 같은 구조 기준에서 두 점을 잡는 것이 중요합니다.";
   } else if (observedCount === 0) {
     activeStep = "observed";
-    title.textContent = "이제 현장에서 보이는 대상을 찍으세요.";
-    body.textContent =
-      "기준점은 준비됐습니다. 이제 사진에서 실제로 보이는 스위치나 박스 같은 대상을 눌러 위치를 기록하세요.";
+    title.textContent = "이제 보이는 대상을 찍으세요.";
+    body.textContent = "기준점은 잡혔습니다. 사진에서 실제로 확인되는 대상만 표시한 뒤 후보 찾기를 누르면 됩니다.";
   } else if (!lastRunResult) {
     activeStep = "run";
-    title.textContent = "이제 후보 찾기를 누르세요.";
-    body.textContent =
-      "기준점과 보이는 대상이 준비됐습니다. 이제 후보 찾기를 눌러 빠짐, 추가, 위치 차이 후보를 계산하세요.";
+    title.textContent = "후보 찾기를 누르세요.";
+    body.textContent = "엔진이 빠짐, 추가, 위치 차이 후보를 계산합니다. 결과는 오른쪽 후보 검토 카드에 나타납니다.";
   } else {
     activeStep = "run";
-    title.textContent = "오른쪽 후보 카드에서 결과를 검토하세요.";
-    body.textContent =
-      "후보를 누르면 근거가 보입니다. 맞으면 확정, 아니면 반려, 판단이 어려우면 보류로 표시하면 됩니다.";
+    title.textContent = "후보가 생성되었습니다.";
+    body.textContent = "후보 카드를 누르면 같은 위치가 캔버스에서 강조됩니다. 확인, 반려, 보류로 검토를 남길 수 있습니다.";
   }
 
   for (const chip of document.querySelectorAll("[data-step-chip]")) {
@@ -244,6 +321,7 @@ function renderFieldGuide(scenario = parseScenario()) {
 function setPlacementMode(mode) {
   placementMode = mode;
   renderPlacementStatus();
+  renderAnchorPresetUI();
   renderFieldGuide();
 }
 
@@ -296,6 +374,7 @@ function renderMetrics(result = null) {
     getScenarioMetadata().name || scenario.segment.label || scenario.segment.segmentId;
   document.querySelector("#scenario-detail").textContent =
     scenario.segment.label || "Editable local draft";
+  renderRatioSummary(scenario);
 }
 
 function setScreen(screenName) {
@@ -689,6 +768,7 @@ function renderSummary(result) {
 }
 
 function renderProjectedCheckpoints(result) {
+  const scenario = parseScenario();
   const root = document.querySelector("#projected-checkpoints");
   root.innerHTML = "";
 
@@ -698,11 +778,17 @@ function renderProjectedCheckpoints(result) {
   }
 
   for (const checkpoint of result.projectedCheckpoints) {
+    const sourceCheckpoint = scenario.checkpoints.find(
+      (entry) => entry.checkpointId === checkpoint.checkpointId
+    );
     const article = document.createElement("article");
     article.className = "checkpoint-card";
     article.innerHTML = `
       <strong>${checkpoint.checkpointId}</strong>
       <p>기대 요소: ${checkpoint.semanticExpectation}</p>
+      <p>기준점 쌍: ${sourceCheckpoint?.anchorBasis?.join(" -> ") || "없음"}</p>
+      <p>가로 비율: ${sourceCheckpoint?.normalizedPosition?.spanRatio ?? "n/a"}</p>
+      <p>세로 비율: ${sourceCheckpoint?.normalizedPosition?.heightRatio ?? "n/a"}</p>
       <p>투영 좌표: (${checkpoint.projectedPoint.x}, ${checkpoint.projectedPoint.y})</p>
       <p>허용 반경: ${checkpoint.expectedNeighborhood.allowedRadius.toFixed(2)}</p>
       <p>탐색 반경: ${checkpoint.expectedNeighborhood.searchRadius.toFixed(2)}</p>
@@ -1206,12 +1292,15 @@ function applyDraggedPoint(kind, index, point) {
 }
 
 function addAnchorAtPoint(point) {
+  const preset = getSelectedAnchorPreset();
   const scenario = updateScenario((draft) => {
-    const anchorIndex = draft.anchors.length + 1;
+    const sameKindCount = draft.anchors.filter(
+      (anchor) => anchor.anchorKind === preset.anchorKind
+    ).length;
     draft.anchors.push({
-      anchorId: `anchor-${anchorIndex}`,
+      anchorId: `${preset.idPrefix}-${sameKindCount + 1}`,
       segmentId: draft.segment.segmentId,
-      anchorKind: "wall_corner",
+      anchorKind: preset.anchorKind,
       geometryType: "point",
       drawingReference: { point: { x: 0, y: 0 } },
       fieldObservation: { point },
@@ -1224,7 +1313,7 @@ function addAnchorAtPoint(point) {
   setSelectedBuilderEntity("anchor", scenario.anchors.at(-1)?.anchorId, { scroll: true });
   renderScenarioValidation(scenario);
   renderSelectedCandidateDetail(lastRunResult);
-  setFlash(`Added a new anchor at (${point.x}, ${point.y}).`);
+  setFlash(`${preset.label} 기준점을 (${point.x}, ${point.y})에 추가했습니다.`);
 }
 
 function addObservedAtPoint(point) {
@@ -1422,6 +1511,7 @@ function renderCanvas({ scenario, result }) {
   }
 
   if (placementMode !== "none") {
+    const preset = getSelectedAnchorPreset();
     const placementLabel = new window.Konva.Label({
       x: 18,
       y: 18,
@@ -1438,8 +1528,8 @@ function renderCanvas({ scenario, result }) {
       new window.Konva.Text({
         text:
           placementMode === "anchor"
-            ? "Tap anywhere to place the next anchor"
-            : "Tap anywhere to place the next observed element",
+            ? `${preset.label} 위치를 누르세요`
+            : "보이는 대상 위치를 누르세요",
         fontFamily: "Georgia",
         fontSize: 14,
         padding: 10,
@@ -1480,9 +1570,9 @@ function renderCanvas({ scenario, result }) {
     : `${scenarioName}: drag anchors and observed elements to refine their positions.`;
   const placementHint =
     placementMode === "anchor"
-      ? " Tap an empty area to place a new anchor."
+      ? ` ${getSelectedAnchorPreset().help}`
       : placementMode === "observed"
-        ? " Tap an empty area to place a new observed element."
+        ? " 사진에서 실제로 보이는 대상 위치를 누르세요."
         : "";
   document.querySelector("#visual-caption").textContent = `${baseCaption}${placementHint}`;
   renderPlacementStatus();
@@ -1785,7 +1875,7 @@ function bindEvents() {
     .addEventListener("click", () => {
       setPlacementMode("anchor");
       renderCanvas({ scenario: parseScenario(), result: lastRunResult });
-      setFlash("Tap an empty area to place a new anchor.");
+      setFlash(getSelectedAnchorPreset().help);
     });
 
   document
@@ -1793,7 +1883,7 @@ function bindEvents() {
     .addEventListener("click", () => {
       setPlacementMode("observed");
       renderCanvas({ scenario: parseScenario(), result: lastRunResult });
-      setFlash("Tap an empty area to place a new observed element.");
+      setFlash("사진에서 실제로 보이는 대상 위치를 누르세요.");
     });
 
   document
@@ -1803,6 +1893,16 @@ function bindEvents() {
       renderCanvas({ scenario: parseScenario(), result: lastRunResult });
       setFlash("Placement mode cleared.");
     });
+
+  for (const button of document.querySelectorAll("[data-anchor-preset]")) {
+    button.addEventListener("click", () => {
+      selectedAnchorPreset = button.dataset.anchorPreset;
+      renderAnchorPresetUI();
+      setPlacementMode("anchor");
+      renderCanvas({ scenario: parseScenario(), result: lastRunResult });
+      setFlash(getSelectedAnchorPreset().help);
+    });
+  }
 
   document
     .querySelector("[data-action='reset-scenario']")
@@ -1946,6 +2046,1102 @@ function bindEvents() {
   });
 }
 
+/* const UI_ANCHOR_PRESETS = {
+  window_left_top: {
+    label: "창호 좌상단",
+    anchorKind: "window_frame_left_top",
+    idPrefix: "window-left-top",
+    help: "창호의 움직이는 창짝이 아니라 바깥 고정 프레임의 왼쪽 위 모서리를 누르세요."
+  },
+  window_right_top: {
+    label: "창호 우상단",
+    anchorKind: "window_frame_right_top",
+    idPrefix: "window-right-top",
+    help: "같은 바깥 프레임 기준으로 오른쪽 위 모서리를 누르세요."
+  },
+  window_left_bottom: {
+    label: "창호 좌하단",
+    anchorKind: "window_frame_left_bottom",
+    idPrefix: "window-left-bottom",
+    help: "바깥 고정 프레임의 왼쪽 아래 모서리를 누르세요."
+  },
+  window_right_bottom: {
+    label: "창호 우하단",
+    anchorKind: "window_frame_right_bottom",
+    idPrefix: "window-right-bottom",
+    help: "같은 바깥 프레임 기준으로 오른쪽 아래 모서리를 누르세요."
+  },
+  wall_left_corner: {
+    label: "벽 좌측 모서리",
+    anchorKind: "wall_left_corner",
+    idPrefix: "wall-left-corner",
+    help: "비교 구간에서 왼쪽 벽 코너처럼 고정된 구조 모서리를 누르세요."
+  },
+  wall_right_corner: {
+    label: "벽 우측 모서리",
+    anchorKind: "wall_right_corner",
+    idPrefix: "wall-right-corner",
+    help: "같은 구조선 기준으로 오른쪽 벽 코너를 누르세요."
+  }
+};
+
+function getSelectedAnchorPreset() {
+  return UI_ANCHOR_PRESETS[selectedAnchorPreset] ?? UI_ANCHOR_PRESETS.window_left_top;
+}
+
+function getPlacementLabel(mode) {
+  if (mode === "anchor") {
+    return "기준점 배치 중";
+  }
+  if (mode === "observed") {
+    return "관측 요소 배치 중";
+  }
+  return "배치 모드 없음";
+}
+
+function renderAnchorPresetUI() {
+  for (const button of document.querySelectorAll("[data-anchor-preset]")) {
+    button.classList.toggle("is-active", button.dataset.anchorPreset === selectedAnchorPreset);
+  }
+
+  const help = document.querySelector("#anchor-preset-help");
+  if (!help) {
+    return;
+  }
+
+  const preset = getSelectedAnchorPreset();
+  help.textContent = `선택된 기준점: ${preset.label}. ${preset.help}`;
+}
+
+function renderRatioSummary(scenario = parseScenario()) {
+  const root = document.querySelector("#ratio-summary");
+  if (!root) {
+    return;
+  }
+
+  root.innerHTML = "";
+
+  if (!scenario.checkpoints?.length) {
+    root.innerHTML = "<p>체크포인트가 아직 없습니다. 체크포인트를 추가하면 기준 비율이 여기에 표시됩니다.</p>";
+    return;
+  }
+
+  for (const checkpoint of scenario.checkpoints) {
+    const article = document.createElement("article");
+    article.className = "checkpoint-card";
+    article.innerHTML = `
+      <strong>${checkpoint.checkpointId}</strong>
+      <p>기준점 쌍: ${(checkpoint.anchorBasis ?? []).join(" -> ") || "없음"}</p>
+      <p>가로 비율(spanRatio): ${checkpoint.normalizedPosition?.spanRatio ?? "n/a"}</p>
+      <p>세로 비율(heightRatio): ${checkpoint.normalizedPosition?.heightRatio ?? "n/a"}</p>
+      <p>기대 요소: ${checkpoint.semanticExpectation ?? "n/a"}</p>
+    `;
+    root.appendChild(article);
+  }
+}
+
+function renderFieldGuide(scenario = parseScenario()) {
+  const title = document.querySelector("#field-guide-title");
+  const body = document.querySelector("#field-guide-body");
+  if (!title || !body) {
+    return;
+  }
+
+  const anchorCount = scenario.anchors?.length ?? 0;
+  const observedCount = scenario.observedElements?.length ?? 0;
+  const preset = getSelectedAnchorPreset();
+  let activeStep = "anchors";
+
+  if (placementMode === "anchor") {
+    activeStep = "anchors";
+    if (anchorCount === 0) {
+      title.textContent = "첫 번째 기준점을 찍으세요.";
+      body.textContent = `${preset.label} 기준점을 잡는 단계입니다. ${preset.help} 같은 구조에서 두 번째 기준점도 이어서 잡아야 비율이 의미를 가집니다.`;
+    } else if (anchorCount === 1) {
+      title.textContent = "두 번째 기준점을 찍으세요.";
+      body.textContent = `첫 번째 기준점과 같은 구조선에 있는 짝을 찍어야 합니다. 예를 들어 좌상단을 찍었다면 같은 프레임의 우상단을 찍는 식으로 맞추세요. ${preset.help}`;
+    } else {
+      title.textContent = "기준점은 충분합니다.";
+      body.textContent = "이제 사진에서 실제로 보이는 대상만 찍으면 됩니다. 스위치 박스나 노출된 박스처럼 비교할 대상을 표시하세요.";
+    }
+  } else if (placementMode === "observed") {
+    activeStep = "observed";
+    title.textContent = "보이는 대상을 찍으세요.";
+    body.textContent = "사진에서 실제로 보이는 스위치, 박스, 마감 요소를 찍습니다. 기준점과 다르게 움직일 수 있는 대상이어도 괜찮습니다.";
+  } else if (anchorCount < 2) {
+    activeStep = "anchors";
+    title.textContent = "먼저 기준점 두 개를 잡으세요.";
+    body.textContent = "문틀 끝, 창호 바깥 프레임 모서리, 벽 코너처럼 잘 안 바뀌는 구조점을 고르세요. 같은 구조 기준에서 두 점을 잡는 것이 중요합니다.";
+  } else if (observedCount === 0) {
+    activeStep = "observed";
+    title.textContent = "이제 보이는 대상을 찍으세요.";
+    body.textContent = "기준점은 잡혔습니다. 사진에서 실제로 확인되는 대상만 표시한 뒤 후보 찾기를 누르면 됩니다.";
+  } else if (!lastRunResult) {
+    activeStep = "run";
+    title.textContent = "후보 찾기를 누르세요.";
+    body.textContent = "엔진이 빠짐, 추가, 위치 차이 후보를 계산합니다. 결과는 오른쪽 후보 검토 카드에 나타납니다.";
+  } else {
+    activeStep = "run";
+    title.textContent = "후보가 생성되었습니다.";
+    body.textContent = "후보 카드를 누르면 같은 위치가 캔버스에서 강조됩니다. 확인, 반려, 보류로 검토를 남길 수 있습니다.";
+  }
+
+  for (const chip of document.querySelectorAll("[data-step-chip]")) {
+    chip.classList.toggle("is-active", chip.dataset.stepChip === activeStep);
+  }
+}
+
+function setScreen(screenName) {
+  for (const screen of document.querySelectorAll(".screen")) {
+    screen.classList.toggle("is-active", screen.dataset.screen === screenName);
+  }
+
+  for (const button of document.querySelectorAll(".nav-button")) {
+    button.classList.toggle(
+      "is-active",
+      button.dataset.screenTarget === screenName
+    );
+  }
+
+  document.querySelector("#screen-title").textContent =
+    screenName === "engine" ? "현장 비교" : screenName === "workspace" ? "운영" : "소개";
+}
+
+function renderSummary(result) {
+  const root = document.querySelector("#engine-summary");
+  root.innerHTML = "";
+  const grid = document.createElement("div");
+  grid.className = "summary-card-grid";
+
+  const blocks = [
+    {
+      label: "구간",
+      value: result.segmentId,
+      detail: "지금 비교 중인 국소 구간입니다."
+    },
+    {
+      label: "기준점",
+      value: result.activeAnchors.map((anchor) => anchor.anchorId).join(", "),
+      detail: "이번 정합에서 실제로 사용된 기준점 쌍입니다."
+    },
+    {
+      label: "정합",
+      value: result.alignmentModel,
+      detail: `${result.alignmentQuality.status} / score ${result.alignmentQuality.score.toFixed(2)}`
+    },
+    {
+      label: "결과",
+      value: `${result.projectedCheckpoints.length} projected / ${result.candidates.length} candidates`,
+      detail: "투영된 체크포인트 수와 후보 수입니다."
+    }
+  ];
+
+  for (const block of blocks) {
+    const article = document.createElement("article");
+    article.className = "summary-card";
+    article.innerHTML = `
+      <span>${block.label}</span>
+      <strong>${block.value}</strong>
+      <p>${block.detail}</p>
+    `;
+    grid.appendChild(article);
+  }
+
+  root.appendChild(grid);
+}
+
+function renderProjectedCheckpoints(result) {
+  const scenario = parseScenario();
+  const root = document.querySelector("#projected-checkpoints");
+  root.innerHTML = "";
+
+  if (!result.projectedCheckpoints.length) {
+    root.innerHTML = "<p>아직 예상 위치가 없습니다.</p>";
+    return;
+  }
+
+  for (const checkpoint of result.projectedCheckpoints) {
+    const sourceCheckpoint = scenario.checkpoints.find(
+      (entry) => entry.checkpointId === checkpoint.checkpointId
+    );
+    const article = document.createElement("article");
+    article.className = "checkpoint-card";
+    article.innerHTML = `
+      <strong>${checkpoint.checkpointId}</strong>
+      <p>기대 요소: ${checkpoint.semanticExpectation}</p>
+      <p>기준점 쌍: ${sourceCheckpoint?.anchorBasis?.join(" -> ") || "없음"}</p>
+      <p>가로 비율: ${sourceCheckpoint?.normalizedPosition?.spanRatio ?? "n/a"}</p>
+      <p>세로 비율: ${sourceCheckpoint?.normalizedPosition?.heightRatio ?? "n/a"}</p>
+      <p>투영 좌표: (${checkpoint.projectedPoint.x}, ${checkpoint.projectedPoint.y})</p>
+      <p>허용 반경: ${checkpoint.expectedNeighborhood.allowedRadius.toFixed(2)}</p>
+      <p>탐색 반경: ${checkpoint.expectedNeighborhood.searchRadius.toFixed(2)}</p>
+    `;
+    root.appendChild(article);
+  }
+}
+
+function renderCandidates(result) {
+  const root = document.querySelector("#candidate-cards");
+  root.innerHTML = "";
+
+  if (!result.candidates.length) {
+    const empty = document.createElement("p");
+    empty.className = "empty-state";
+    empty.textContent = "현재 시나리오에서는 아직 후보가 생성되지 않았습니다.";
+    root.appendChild(empty);
+    return;
+  }
+
+  for (const candidate of result.candidates) {
+    const review = currentReviewSession.reviews.find(
+      (entry) => entry.candidateId === candidate.candidateId
+    ) ?? { status: "unreviewed", note: "" };
+    const article = document.createElement("article");
+    article.className = "candidate-card";
+    article.dataset.type = candidate.candidateType;
+    article.dataset.candidateId = candidate.candidateId;
+    article.innerHTML = `
+      <div class="finding-topline">
+        <strong>${candidate.candidateType}</strong>
+        <span class="tag">${candidate.reasonCode}</span>
+      </div>
+      <p>체크포인트: ${candidate.checkpointId ?? "none"}</p>
+      <p>사용 기준점: ${candidate.activeAnchors.join(", ")}</p>
+      <p>검토 힌트: ${candidate.reviewHint}</p>
+      <p>근거 영역 ID: ${candidate.evidenceRegion.evidenceId}</p>
+      <div class="review-badge">상태: ${review.status}</div>
+      <div class="review-actions">
+        <button type="button" data-review-status="confirm">확인</button>
+        <button type="button" data-review-status="reject">반려</button>
+        <button type="button" data-review-status="hold">보류</button>
+      </div>
+      <label class="review-note">
+        메모
+        <textarea>${review.note ?? ""}</textarea>
+      </label>
+    `;
+
+    if (candidate.candidateId === selectedCandidateId) {
+      article.classList.add("is-selected");
+    }
+
+    article.addEventListener("click", (event) => {
+      if (event.target.closest("button, textarea")) {
+        return;
+      }
+      focusCandidate(candidate.candidateId);
+    });
+
+    const noteField = article.querySelector("textarea");
+    for (const button of article.querySelectorAll("[data-review-status]")) {
+      button.addEventListener("click", async () => {
+        await saveCandidateReview(
+          candidate.candidateId,
+          button.dataset.reviewStatus,
+          noteField.value
+        );
+      });
+    }
+
+    root.appendChild(article);
+  }
+}
+
+function renderReviewSummary(result) {
+  const root = document.querySelector("#review-summary");
+  root.innerHTML = "";
+
+  if (!result.candidates.length) {
+    root.innerHTML = "<p>아직 검토 요약이 없습니다.</p>";
+    return;
+  }
+
+  const counts = {
+    unreviewed: 0,
+    confirm: 0,
+    reject: 0,
+    hold: 0
+  };
+
+  for (const candidate of result.candidates) {
+    const review = currentReviewSession.reviews.find(
+      (entry) => entry.candidateId === candidate.candidateId
+    );
+    counts[review?.status ?? "unreviewed"] += 1;
+  }
+
+  const grid = document.createElement("div");
+  grid.className = "summary-card-grid";
+  const items = [
+    ["미검토", counts.unreviewed],
+    ["확인", counts.confirm],
+    ["반려", counts.reject],
+    ["보류", counts.hold]
+  ];
+
+  for (const [label, value] of items) {
+    const card = document.createElement("article");
+    card.className = "summary-card";
+    card.innerHTML = `
+      <span>${label}</span>
+      <strong>${value}</strong>
+      <p>현재 후보 검토 집계입니다.</p>
+    `;
+    grid.appendChild(card);
+  }
+
+  root.appendChild(grid);
+}
+
+function renderScenarioValidation(scenario) {
+  const root = document.querySelector("#validation-summary");
+  if (!root) {
+    return;
+  }
+
+  root.innerHTML = "";
+  const issues = validateScenarioDraft(scenario);
+
+  if (!issues.length) {
+    root.innerHTML =
+      "<p>입력 점검 통과. 현재 초안은 최소 엔진 입력 규칙을 만족합니다.</p>";
+    return;
+  }
+
+  for (const issue of issues) {
+    const article = document.createElement("article");
+    article.className = "summary-card";
+    article.innerHTML = `
+      <span>${issue.level}</span>
+      <strong>${issue.message}</strong>
+      <p>엔진 결과를 신뢰하기 전에 이 항목을 먼저 정리하세요.</p>
+    `;
+    root.appendChild(article);
+  }
+}
+
+function renderSelectedCandidateDetail(result) {
+  const root = document.querySelector("#candidate-detail");
+  if (!root) {
+    return;
+  }
+
+  root.innerHTML = "";
+  const candidate = findSelectedCandidate(result);
+
+  if (!candidate) {
+    root.innerHTML =
+      "<p>후보 카드를 누르면 근거 좌표와 사용 기준점이 여기에 표시됩니다.</p>";
+    return;
+  }
+
+  const review = currentReviewSession.reviews.find(
+    (entry) => entry.candidateId === candidate.candidateId
+  );
+  const article = document.createElement("article");
+  article.className = "checkpoint-card";
+  article.innerHTML = `
+    <strong>${candidate.candidateId}</strong>
+    <p>유형: ${candidate.candidateType}</p>
+    <p>체크포인트: ${candidate.checkpointId ?? "none"}</p>
+    <p>이유 코드: ${candidate.reasonCode}</p>
+    <p>근거 중심: (${candidate.evidenceRegion.center.x}, ${candidate.evidenceRegion.center.y})</p>
+    <p>근거 반경: ${candidate.evidenceRegion.radius}</p>
+    <p>사용 기준점: ${candidate.activeAnchors.join(", ")}</p>
+    <p>검토 상태: ${review?.status ?? "unreviewed"}</p>
+    <p>메모: ${review?.note?.trim() || "none"}</p>
+  `;
+  root.appendChild(article);
+}
+
+function addAnchorAtPoint(point) {
+  const preset = getSelectedAnchorPreset();
+  const scenario = updateScenario((draft) => {
+    const sameKindCount = draft.anchors.filter(
+      (anchor) => anchor.anchorKind === preset.anchorKind
+    ).length;
+    draft.anchors.push({
+      anchorId: `${preset.idPrefix}-${sameKindCount + 1}`,
+      segmentId: draft.segment.segmentId,
+      anchorKind: preset.anchorKind,
+      geometryType: "point",
+      drawingReference: { point: { x: 0, y: 0 } },
+      fieldObservation: { point },
+      stabilityScore: 0.8,
+      visibilityState: "visible"
+    });
+  });
+
+  setPlacementMode("none");
+  setSelectedBuilderEntity("anchor", scenario.anchors.at(-1)?.anchorId, { scroll: true });
+  renderScenarioValidation(scenario);
+  renderSelectedCandidateDetail(lastRunResult);
+  setFlash(`${preset.label} 기준점을 (${point.x}, ${point.y})에 추가했습니다.`);
+}
+
+function addObservedAtPoint(point) {
+  const scenario = updateScenario((draft) => {
+    const observedIndex = draft.observedElements.length + 1;
+    draft.observedElements.push({
+      elementId: `observed-${observedIndex}`,
+      segmentId: draft.segment.segmentId,
+      elementKind: "switch_box",
+      point
+    });
+  });
+
+  setPlacementMode("none");
+  setSelectedBuilderEntity("observed", scenario.observedElements.at(-1)?.elementId, {
+    scroll: true
+  });
+  renderScenarioValidation(scenario);
+  renderSelectedCandidateDetail(lastRunResult);
+  setFlash(`관측 요소를 (${point.x}, ${point.y})에 추가했습니다.`);
+}
+
+function resetOutputPanels() {
+  selectedCandidateId = null;
+  document.querySelector("#output").textContent = "No output yet.";
+  document.querySelector("#candidate-cards").innerHTML =
+    '<p class="empty-state">아직 후보가 없습니다.</p>';
+  document.querySelector("#projected-checkpoints").innerHTML =
+    "<p>아직 예상 위치가 없습니다.</p>";
+  document.querySelector("#review-summary").innerHTML =
+    "<p>아직 검토 요약이 없습니다.</p>";
+  document.querySelector("#engine-summary").innerHTML =
+    "<p>후보 찾기를 누르면 정합 결과가 여기에 표시됩니다.</p>";
+  document.querySelector("#metric-candidate-count").textContent = "0";
+  const detail = document.querySelector("#candidate-detail");
+  if (detail) {
+    detail.innerHTML =
+      "<p>후보 카드를 누르면 근거 좌표와 사용 기준점이 여기에 표시됩니다.</p>";
+  }
+}
+
+function renderCanvas({ scenario, result }) {
+  if (!window.Konva) {
+    document.querySelector("#visual-caption").textContent =
+      "Konva가 로드되지 않아 오버레이를 그릴 수 없습니다.";
+    renderPlacementStatus();
+    return;
+  }
+
+  const currentStage = stage ?? createStage();
+  currentStage.destroyChildren();
+
+  const layer = new window.Konva.Layer();
+  const background = new window.Konva.Rect({
+    x: 0,
+    y: 0,
+    width: currentStage.width(),
+    height: currentStage.height(),
+    fill: "rgba(255, 255, 255, 0.08)"
+  });
+  const rawPoints = [
+    ...(scenario.anchors ?? []).map((anchor) => anchor.fieldObservation.point),
+    ...(scenario.observedElements ?? []).map((element) => element.point),
+    ...((result?.projectedCheckpoints ?? []).map((entry) => entry.projectedPoint)),
+    ...((result?.candidates ?? [])
+      .map((candidate) => candidate.evidenceRegion?.center)
+      .filter(Boolean))
+  ];
+  const projector = createProjector(
+    rawPoints,
+    currentStage.width(),
+    currentStage.height()
+  );
+
+  layer.add(background);
+
+  const anchorPoints = (scenario.anchors ?? []).map((anchor, index) => ({
+    anchor,
+    index,
+    point: projector.project(anchor.fieldObservation.point)
+  }));
+
+  if (anchorPoints.length >= 2) {
+    layer.add(
+      new window.Konva.Line({
+        points: anchorPoints.flatMap((entry) => [entry.point.x, entry.point.y]),
+        stroke: "#111827",
+        strokeWidth: 3,
+        lineCap: "round"
+      })
+    );
+  }
+
+  for (const entry of anchorPoints) {
+    const circle = new window.Konva.Circle({
+      x: entry.point.x,
+      y: entry.point.y,
+      radius: 9,
+      fill: "#111827",
+      draggable: true
+    });
+    circle.on("dragend", () => {
+      const nextPoint = projector.invert(circle.position());
+      applyDraggedPoint("anchor", entry.index, nextPoint);
+    });
+    layer.add(circle);
+    drawLabel(layer, entry.anchor.anchorId, entry.point, "#111827");
+  }
+
+  for (const [index, element] of (scenario.observedElements ?? []).entries()) {
+    const point = projector.project(element.point);
+    const rect = new window.Konva.Rect({
+      x: point.x - 10,
+      y: point.y - 10,
+      width: 20,
+      height: 20,
+      cornerRadius: 5,
+      fill: "#8b5e3c",
+      draggable: true
+    });
+    rect.on("dragend", () => {
+      const nextPoint = projector.invert({
+        x: rect.x() + 10,
+        y: rect.y() + 10
+      });
+      applyDraggedPoint("observed", index, nextPoint);
+    });
+    layer.add(rect);
+    drawLabel(layer, element.elementId, point, "#8b5e3c");
+  }
+
+  for (const checkpoint of result?.projectedCheckpoints ?? []) {
+    const point = projector.project(checkpoint.projectedPoint);
+    const radius = Math.max(checkpoint.expectedNeighborhood.allowedRadius, 8);
+    const searchRadius = Math.max(checkpoint.expectedNeighborhood.searchRadius, 14);
+
+    layer.add(
+      new window.Konva.Circle({
+        x: point.x,
+        y: point.y,
+        radius: searchRadius,
+        stroke: "#93c5fd",
+        dash: [8, 6],
+        strokeWidth: 2
+      })
+    );
+    layer.add(
+      new window.Konva.Circle({
+        x: point.x,
+        y: point.y,
+        radius,
+        stroke: "#2563eb",
+        strokeWidth: 2
+      })
+    );
+    layer.add(
+      new window.Konva.Circle({
+        x: point.x,
+        y: point.y,
+        radius: 6,
+        fill: "#2563eb"
+      })
+    );
+    drawLabel(layer, checkpoint.checkpointId, point, "#2563eb");
+  }
+
+  for (const candidate of result?.candidates ?? []) {
+    const center = candidate.evidenceRegion?.center;
+    if (!center) {
+      continue;
+    }
+
+    const point = projector.project(center);
+    const color =
+      candidate.candidateType === "missing"
+        ? "#e11d48"
+        : candidate.candidateType === "position_diff"
+          ? "#2563eb"
+          : "#b7791f";
+
+    layer.add(
+      new window.Konva.Ring({
+        x: point.x,
+        y: point.y,
+        innerRadius: 12,
+        outerRadius: 18,
+        stroke: color,
+        strokeWidth: 4
+      })
+    );
+
+    if (candidate.candidateId === selectedCandidateId) {
+      layer.add(
+        new window.Konva.Circle({
+          x: point.x,
+          y: point.y,
+          radius: 28,
+          stroke: "#f59e0b",
+          strokeWidth: 4,
+          dash: [10, 6]
+        })
+      );
+      layer.add(
+        new window.Konva.Circle({
+          x: point.x,
+          y: point.y,
+          radius: 6,
+          fill: "#f59e0b"
+        })
+      );
+    }
+
+    drawLabel(layer, candidate.candidateType, point, color);
+  }
+
+  if (placementMode !== "none") {
+    const preset = getSelectedAnchorPreset();
+    const placementLabel = new window.Konva.Label({
+      x: 18,
+      y: 18,
+      opacity: 0.96,
+      listening: false
+    });
+    placementLabel.add(
+      new window.Konva.Tag({
+        fill: "rgba(17, 17, 17, 0.92)",
+        cornerRadius: 999
+      })
+    );
+    placementLabel.add(
+      new window.Konva.Text({
+        text:
+          placementMode === "anchor"
+            ? `${preset.label} 위치를 누르세요`
+            : "보이는 대상 위치를 누르세요",
+        fontFamily: "Avenir Next",
+        fontSize: 14,
+        padding: 10,
+        fill: "#ffffff"
+      })
+    );
+    layer.add(placementLabel);
+  }
+
+  currentStage.add(layer);
+  currentStage.off("click tap");
+  currentStage.on("click tap", () => {
+    if (placementMode === "none") {
+      return;
+    }
+
+    const pointer = currentStage.getPointerPosition();
+    if (!pointer) {
+      return;
+    }
+
+    const nextPoint = projector.invert(pointer);
+    if (placementMode === "anchor") {
+      addAnchorAtPoint(nextPoint);
+      return;
+    }
+
+    if (placementMode === "observed") {
+      addObservedAtPoint(nextPoint);
+    }
+  });
+
+  const candidateCount = result?.candidates?.length ?? 0;
+  const scenarioName =
+    getScenarioMetadata().name || scenario.segment?.label || scenario.segment?.segmentId;
+  const baseCaption = result
+    ? `${scenarioName}: ${candidateCount}개의 후보가 생성되었습니다. 후보 카드를 누르면 같은 위치가 캔버스에서 강조됩니다.`
+    : `${scenarioName}: 기준점과 관측 요소를 드래그해서 위치를 다듬을 수 있습니다.`;
+  const placementHint =
+    placementMode === "anchor"
+      ? ` ${getSelectedAnchorPreset().help}`
+      : placementMode === "observed"
+        ? " 사진에서 실제로 보이는 대상의 위치를 누르세요."
+        : "";
+  document.querySelector("#visual-caption").textContent = `${baseCaption}${placementHint}`;
+  renderPlacementStatus();
+  renderFieldGuide(scenario);
+}
+
+async function runEngine() {
+  try {
+    const scenario = parseScenario();
+    saveScenario();
+    await loadReviewSession();
+    const result = isLocalShellMode()
+      ? generateComparisonCandidates(scenario)
+      : await (async () => {
+          const response = await fetch("/api/engine/run", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: stringify(scenario)
+          });
+          const payload = await response.json();
+
+          if (!response.ok) {
+            throw new Error(payload.error ?? "Engine run failed.");
+          }
+
+          return payload;
+        })();
+
+    lastRunResult = result;
+    selectedCandidateId = result.candidates[0]?.candidateId ?? null;
+    renderMetrics(result);
+    renderScenarioValidation(scenario);
+    renderSummary(result);
+    renderProjectedCheckpoints(result);
+    renderReviewSummary(result);
+    renderCandidates(result);
+    renderSelectedCandidateDetail(result);
+    renderOutput(result);
+    renderCanvas({ scenario, result });
+    renderFormBuilder();
+    document.querySelector("#engine-status").textContent = "Ready";
+    document.querySelector("#engine-status-detail").textContent =
+      `${result.candidates.length} candidates from ${result.segmentId}`;
+    setFlash("후보 계산이 완료되었습니다.");
+  } catch (error) {
+    document.querySelector("#engine-status").textContent = "Error";
+    document.querySelector("#engine-status-detail").textContent = error.message;
+    setFlash(error.message, true);
+  }
+}
+
+async function saveScenarioToServer() {
+  const metadata = getScenarioMetadata();
+
+  if (!metadata.id || !metadata.name) {
+    throw new Error("Scenario ID and name are required.");
+  }
+
+  const saved = isLocalShellMode()
+    ? (() => {
+        const library = readLibrary(SCENARIO_LIBRARY_KEY, []);
+        const nextEntry = {
+          ...metadata,
+          scenario: parseScenario(),
+          updatedAt: new Date().toISOString()
+        };
+        writeLibrary(
+          SCENARIO_LIBRARY_KEY,
+          [nextEntry, ...library.filter((entry) => entry.id !== metadata.id)]
+        );
+        return nextEntry;
+      })()
+    : await (async () => {
+        const response = await fetch("/api/engine/scenario/save", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: stringify({
+            ...metadata,
+            scenario: parseScenario()
+          })
+        });
+        const payload = await response.json();
+
+        if (!response.ok) {
+          throw new Error(payload.error ?? "Failed to save scenario.");
+        }
+
+        return payload;
+      })();
+
+  await listSavedScenarios();
+  setFlash(`시나리오 ${saved.name}을 저장했습니다.`);
+}
+
+async function saveCandidateReview(candidateId, status, note) {
+  const scenarioId = getScenarioMetadata().id || "door-left-wall";
+  currentReviewSession = isLocalShellMode()
+    ? (() => {
+        const library = readLibrary(REVIEW_LIBRARY_KEY, []);
+        const existing =
+          library.find((entry) => entry.scenarioId === scenarioId) ??
+          { scenarioId, reviews: [] };
+        const reviews = existing.reviews.filter((entry) => entry.candidateId !== candidateId);
+        reviews.push({ candidateId, status, note });
+        const nextSession = { scenarioId, reviews };
+        writeLibrary(
+          REVIEW_LIBRARY_KEY,
+          [...library.filter((entry) => entry.scenarioId !== scenarioId), nextSession]
+        );
+        return nextSession;
+      })()
+    : await (async () => {
+        const response = await fetch("/api/engine/review/save", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: stringify({
+            scenarioId,
+            review: {
+              candidateId,
+              status,
+              note
+            }
+          })
+        });
+        return response.json();
+      })();
+
+  if (lastRunResult) {
+    renderReviewSummary(lastRunResult);
+    renderCandidates(lastRunResult);
+    renderSelectedCandidateDetail(lastRunResult);
+  }
+
+  setFlash(`후보 ${candidateId}를 ${status} 상태로 저장했습니다.`);
+}
+
+function renderFormBuilder() {
+  const scenario = parseScenario();
+
+  document.querySelector("#form-segment-id").value = scenario.segment.segmentId ?? "";
+  document.querySelector("#form-segment-kind").value =
+    scenario.segment.segmentKind ?? "";
+  document.querySelector("#form-segment-label").value = scenario.segment.label ?? "";
+
+  const anchorRoot = document.querySelector("#anchor-form-list");
+  anchorRoot.innerHTML = "";
+  scenario.anchors.forEach((anchor, index) => {
+    const card = document.createElement("article");
+    card.className = "form-card";
+    card.dataset.builderKind = "anchor";
+    card.dataset.builderId = anchor.anchorId;
+    card.innerHTML = `
+      <h5>기준점 ${index + 1}</h5>
+      <p class="form-card-copy">비교 기준이 되는 구조점입니다.</p>
+      <div class="builder-grid builder-grid-two"></div>
+      <div class="form-card-actions"><button type="button">삭제</button></div>
+    `;
+    const grid = card.querySelector(".builder-grid");
+    grid.appendChild(
+      createLabeledInput("기준점 ID", anchor.anchorId, (event) => {
+        updateScenario((draft) => {
+          draft.anchors[index].anchorId = event.target.value;
+        });
+      })
+    );
+    grid.appendChild(
+      createLabeledInput("구조 종류", anchor.anchorKind, (event) => {
+        updateScenario((draft) => {
+          draft.anchors[index].anchorKind = event.target.value;
+        });
+      })
+    );
+    grid.appendChild(
+      createLabeledInput("현장 X", anchor.fieldObservation.point.x, (event) => {
+        updateScenario((draft) => {
+          draft.anchors[index].fieldObservation.point.x = Number(event.target.value || 0);
+        });
+      }, "number", "0.1")
+    );
+    grid.appendChild(
+      createLabeledInput("현장 Y", anchor.fieldObservation.point.y, (event) => {
+        updateScenario((draft) => {
+          draft.anchors[index].fieldObservation.point.y = Number(event.target.value || 0);
+        });
+      }, "number", "0.1")
+    );
+    grid.appendChild(
+      createLabeledInput("안정성", anchor.stabilityScore, (event) => {
+        updateScenario((draft) => {
+          draft.anchors[index].stabilityScore = Number(event.target.value || 0);
+        });
+      }, "number", "0.01")
+    );
+    grid.appendChild(
+      createLabeledSelect(
+        "가시 상태",
+        anchor.visibilityState,
+        [
+          { value: "visible", label: "visible" },
+          { value: "partial", label: "partial" },
+          { value: "hidden", label: "hidden" }
+        ],
+        (event) => {
+          updateScenario((draft) => {
+            draft.anchors[index].visibilityState = event.target.value;
+          });
+        }
+      )
+    );
+    card.querySelector("button").addEventListener("click", () => {
+      updateScenario((draft) => {
+        draft.anchors.splice(index, 1);
+        for (const checkpoint of draft.checkpoints) {
+          checkpoint.anchorBasis = checkpoint.anchorBasis.filter(
+            (anchorId) => anchorId !== anchor.anchorId
+          );
+        }
+      });
+      setFlash(`기준점 ${anchor.anchorId}를 삭제했습니다.`);
+    });
+    card.addEventListener("click", () => {
+      setSelectedBuilderEntity("anchor", anchor.anchorId);
+    });
+    anchorRoot.appendChild(card);
+  });
+
+  const checkpointRoot = document.querySelector("#checkpoint-form-list");
+  checkpointRoot.innerHTML = "";
+  scenario.checkpoints.forEach((checkpoint, index) => {
+    const card = document.createElement("article");
+    card.className = "form-card";
+    card.dataset.builderKind = "checkpoint";
+    card.dataset.builderId = checkpoint.checkpointId;
+    card.innerHTML = `
+      <h5>체크포인트 ${index + 1}</h5>
+      <p class="form-card-copy">기준점 쌍을 기준으로 계산되는 예상 위치입니다.</p>
+      <div class="builder-grid builder-grid-two"></div>
+      <p class="form-card-copy form-card-copy-secondary"></p>
+      <div class="form-card-actions"><button type="button">삭제</button></div>
+    `;
+    const grid = card.querySelector(".builder-grid");
+    grid.appendChild(
+      createLabeledInput("체크포인트 ID", checkpoint.checkpointId, (event) => {
+        updateScenario((draft) => {
+          draft.checkpoints[index].checkpointId = event.target.value;
+        });
+      })
+    );
+    grid.appendChild(
+      createLabeledInput("기대 요소", checkpoint.semanticExpectation, (event) => {
+        updateScenario((draft) => {
+          draft.checkpoints[index].semanticExpectation = event.target.value;
+        });
+      })
+    );
+    grid.appendChild(
+      createLabeledInput(
+        "spanRatio",
+        checkpoint.normalizedPosition.spanRatio,
+        (event) => {
+          updateScenario((draft) => {
+            draft.checkpoints[index].normalizedPosition.spanRatio = Number(
+              event.target.value || 0
+            );
+          });
+        },
+        "number",
+        "0.01"
+      )
+    );
+    grid.appendChild(
+      createLabeledInput(
+        "heightRatio",
+        checkpoint.normalizedPosition.heightRatio,
+        (event) => {
+          updateScenario((draft) => {
+            draft.checkpoints[index].normalizedPosition.heightRatio = Number(
+              event.target.value || 0
+            );
+          });
+        },
+        "number",
+        "0.01"
+      )
+    );
+    grid.appendChild(
+      createLabeledInput(
+        "허용 반경 비율",
+        checkpoint.allowedTolerance.positionSpanRatio,
+        (event) => {
+          updateScenario((draft) => {
+            draft.checkpoints[index].allowedTolerance.positionSpanRatio = Number(
+              event.target.value || 0
+            );
+          });
+        },
+        "number",
+        "0.01"
+      )
+    );
+    grid.appendChild(
+      createLabeledInput(
+        "탐색 반경 비율",
+        checkpoint.allowedTolerance.searchSpanRatio,
+        (event) => {
+          updateScenario((draft) => {
+            draft.checkpoints[index].allowedTolerance.searchSpanRatio = Number(
+              event.target.value || 0
+            );
+          });
+        },
+        "number",
+        "0.01"
+      )
+    );
+    card.querySelector(".form-card-copy-secondary").textContent =
+      `기준점 쌍: ${checkpoint.anchorBasis.join(", ") || "없음"}`;
+    card.querySelector("button").addEventListener("click", () => {
+      updateScenario((draft) => {
+        draft.checkpoints.splice(index, 1);
+      });
+      setFlash(`체크포인트 ${checkpoint.checkpointId}를 삭제했습니다.`);
+    });
+    card.addEventListener("click", () => {
+      setSelectedBuilderEntity("checkpoint", checkpoint.checkpointId);
+    });
+    checkpointRoot.appendChild(card);
+  });
+
+  const observedRoot = document.querySelector("#observed-form-list");
+  observedRoot.innerHTML = "";
+  scenario.observedElements.forEach((element, index) => {
+    const card = document.createElement("article");
+    card.className = "form-card";
+    card.dataset.builderKind = "observed";
+    card.dataset.builderId = element.elementId;
+    card.innerHTML = `
+      <h5>관측 요소 ${index + 1}</h5>
+      <p class="form-card-copy">사진에서 실제로 보이는 요소 위치입니다.</p>
+      <div class="builder-grid builder-grid-two"></div>
+      <div class="form-card-actions"><button type="button">삭제</button></div>
+    `;
+    const grid = card.querySelector(".builder-grid");
+    grid.appendChild(
+      createLabeledInput("요소 ID", element.elementId, (event) => {
+        updateScenario((draft) => {
+          draft.observedElements[index].elementId = event.target.value;
+        });
+      })
+    );
+    grid.appendChild(
+      createLabeledInput("요소 종류", element.elementKind, (event) => {
+        updateScenario((draft) => {
+          draft.observedElements[index].elementKind = event.target.value;
+        });
+      })
+    );
+    grid.appendChild(
+      createLabeledInput("현장 X", element.point.x, (event) => {
+        updateScenario((draft) => {
+          draft.observedElements[index].point.x = Number(event.target.value || 0);
+        });
+      }, "number", "0.1")
+    );
+    grid.appendChild(
+      createLabeledInput("현장 Y", element.point.y, (event) => {
+        updateScenario((draft) => {
+          draft.observedElements[index].point.y = Number(event.target.value || 0);
+        });
+      }, "number", "0.1")
+    );
+    card.querySelector("button").addEventListener("click", () => {
+      updateScenario((draft) => {
+        draft.observedElements.splice(index, 1);
+      });
+      setFlash(`관측 요소 ${element.elementId}를 삭제했습니다.`);
+    });
+    card.addEventListener("click", () => {
+      setSelectedBuilderEntity("observed", element.elementId);
+    });
+    observedRoot.appendChild(card);
+  });
+
+  renderBuilderSelection();
+}
+
+*/
 function init() {
   const saved = loadScenario();
   document.querySelector("#scenario-id-input").value = saved.metadata.id;
@@ -1953,11 +3149,17 @@ function init() {
   document.querySelector("#scenario-description-input").value =
     saved.metadata.description;
   document.querySelector("#engine-scenario-input").value = saved.scenarioText;
+  renderAnchorPresetUI();
   renderPlacementStatus();
   renderScenarioValidation(parseScenario());
   renderMetrics();
   resetOutputPanels();
   bindEvents();
+  document
+    .querySelector("[data-action='place-observed']")
+    .addEventListener("click", () => {
+      setFlash("사진에서 실제로 보이는 대상의 위치를 누르세요.");
+    });
   renderFormBuilder();
   renderCanvas({ scenario: parseScenario(), result: null });
   void loadReviewSession();
