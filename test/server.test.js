@@ -243,6 +243,19 @@ test("Local server runs the workspace and record flow through HTTP routes", asyn
         })
       });
       const engineResult = await engineResponse.json();
+      const drawingExtractResponse = await fetch(`${baseUrl}/api/engine/drawing/extract`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          format: "svg",
+          source: `
+            <svg width="200" height="120" xmlns="http://www.w3.org/2000/svg">
+              <rect id="window-frame" x="20" y="20" width="80" height="60" />
+            </svg>
+          `
+        })
+      });
+      const drawingExtract = await drawingExtractResponse.json();
       const saveScenarioResponse = await fetch(`${baseUrl}/api/engine/scenario/save`, {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -346,6 +359,9 @@ test("Local server runs the workspace and record flow through HTTP routes", asyn
       assert.equal(backupDetails.manifest.id, exportedBackup.backupId);
       assert.equal(engineResponse.status, 200);
       assert.equal(engineResult.candidates[0].candidateType, "missing");
+      assert.equal(drawingExtractResponse.status, 200);
+      assert.equal(drawingExtract.sourceFormat, "svg");
+      assert.equal(drawingExtract.anchorCandidates.length >= 4, true);
       assert.equal(saveScenarioResponse.status, 200);
       assert.equal(savedScenario.id, "door-left-wall");
       assert.equal(scenarioList.length, 1);

@@ -5,6 +5,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { BaseMarkService } from "../app/baseMarkService.js";
 import { generateComparisonCandidates } from "../engine/baseMarkEngine.js";
+import { extractDrawingStructureFromSvg } from "../engine/drawingStructureExtractor.js";
 import { ReviewRepository } from "../engine/reviewRepository.js";
 import { EngineScenarioRepository } from "../engine/scenarioRepository.js";
 import { BaseMarkRepository } from "../storage/basemarkRepository.js";
@@ -148,6 +149,22 @@ async function handleApi(request, response, runtime, url) {
       response,
       200,
       generateComparisonCandidates(await readBody(request))
+    );
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/engine/drawing/extract") {
+    const payload = await readBody(request);
+
+    if (payload.format !== "svg") {
+      throw new Error("Only svg drawing extraction is supported in this slice.");
+    }
+
+    return sendJson(
+      response,
+      200,
+      extractDrawingStructureFromSvg(payload.source, {
+        cornerTolerance: payload.cornerTolerance
+      })
     );
   }
 

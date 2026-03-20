@@ -1,8 +1,10 @@
 import { generateComparisonCandidates } from "./engine/baseMarkEngine.js";
+import { extractDrawingStructureFromSvg } from "./engine/drawingStructureExtractor.js";
 
 const STORAGE_KEY = "basemark.engine.scenario.v1";
 const SCENARIO_LIBRARY_KEY = "basemark.engine.scenario.library.v1";
 const REVIEW_LIBRARY_KEY = "basemark.engine.review.library.v1";
+const DRAWING_SOURCE_KEY = "basemark.engine.drawing.svg.v1";
 const CANVAS_WIDTH = 760;
 const CANVAS_HEIGHT = 520;
 const ANCHOR_PRESETS = {
@@ -108,6 +110,7 @@ let currentReviewSession = {
   reviews: []
 };
 let selectedCandidateId = null;
+let lastDrawingExtraction = null;
 let cameraStream = null;
 let placementMode = "none";
 let selectedBuilderEntity = null;
@@ -205,6 +208,26 @@ function getPlacementLabel(mode) {
     return "관측 요소 배치 중";
   }
   return "배치 모드 없음";
+}
+
+function loadDrawingSource() {
+  return (
+    localStorage.getItem(DRAWING_SOURCE_KEY) ??
+    `<svg width="320" height="220" xmlns="http://www.w3.org/2000/svg">
+  <rect id="window-frame" x="70" y="40" width="120" height="120" />
+  <line id="wall-left" x1="30" y1="20" x2="30" y2="200" />
+  <line id="wall-top" x1="30" y1="20" x2="220" y2="20" />
+</svg>`
+  );
+}
+
+function saveDrawingSource() {
+  const input = document.querySelector("#drawing-svg-input");
+  if (!input) {
+    return;
+  }
+
+  localStorage.setItem(DRAWING_SOURCE_KEY, input.value);
 }
 
 function renderPlacementStatus() {
@@ -1951,9 +1974,23 @@ function bindEvents() {
     syncSegmentFormToEditor();
   });
 
+  document.querySelector("#drawing-svg-input").addEventListener("input", () => {
+    saveDrawingSource();
+  });
+
   for (const button of document.querySelectorAll("[data-action='run-engine']")) {
     button.addEventListener("click", runEngine);
   }
+
+  document
+    .querySelector("[data-action='extract-drawing-structure']")
+    .addEventListener("click", async () => {
+      try {
+        await extractDrawingStructure();
+      } catch (error) {
+        setFlash(error.message, true);
+      }
+    });
 
   document
     .querySelector("[data-action='start-camera']")
@@ -2306,6 +2343,109 @@ function renderNextActionCard(scenario = parseScenario()) {
 
   title.textContent = "후보를 검토하고 다음 사진으로 넘어가세요.";
   body.textContent = "오른쪽 후보 카드에서 확인, 반려, 보류를 남기고 다음 구간으로 진행하면 됩니다.";
+}
+
+function renderDrawingExtraction(result = lastDrawingExtraction) {
+  const summaryRoot = document.querySelector("#drawing-extraction-summary");
+  const candidateRoot = document.querySelector("#drawing-anchor-candidates");
+
+  if (!summaryRoot || !candidateRoot) {
+    return;
+  }
+
+  summaryRoot.innerHTML = "";
+  candidateRoot.innerHTML = "";
+
+  if (!result) {
+    summaryRoot.innerHTML = "<p>아직 도면 구조를 읽지 않았습니다.</p>";
+    candidateRoot.innerHTML = '<p class="empty-state">추출된 기준점 후보가 여기에 표시됩니다.</p>';
+    return;
+  }
+
+  const summaryCard = document.createElement("article");
+  summaryCard.className = "checkpoint-card";
+  summaryCard.innerHTML = `
+    <strong>SVG 추출 완료</strong>
+    <p>선분: ${result.segmentCount}개</p>
+    <p>코너: ${result.cornerCount}개</p>
+    <p>앵커 후보: ${result.anchorCandidates.length}개</p>
+  `;
+  summaryRoot.appendChild(summaryCard);
+
+  const candidates = result.anchorCandidates.slice(0, 8);
+
+  for (const candidate of candidates) {
+    const article = document.createElement("article");
+    article.className = "drawing-anchor-card";
+    article.innerHTML = `
+      <strong>${candidate.anchorKind}</strong>
+      <p>ID: ${candidate.anchorId}</p>
+      <p>좌표: (${candidate.point.x}, ${candidate.point.y})</p>
+      <p>출처: ${candidate.sourceType} / ${candidate.sourceId}</p>
+      <button type="button">기준점으로 추가</button>
+    `;
+    article.querySelector("button").addEventListener("click", () => {
+      addDrawingAnchorCandidate(candidate);
+    });
+    candidateRoot.appendChild(article);
+  }
+}
+
+function addDrawingAnchorCandidate(candidate) {
+  const scenario = updateScenario((draft) => {
+    const nextIndex = draft.anchors.length + 1;
+    draft.anchors.push({
+      anchorId: candidate.anchorId ?? `drawing-anchor-${nextIndex}`,
+      segmentId: draft.segment.segmentId,
+      anchorKind: candidate.anchorKind ?? "drawing_corner",
+      geometryType: "point",
+      drawingReference: { point: candidate.point },
+      fieldObservation: { point: candidate.point },
+      stabilityScore: 0.7,
+      visibilityState: "visible"
+    });
+  });
+
+  renderScenarioValidation(scenario);
+  renderFormBuilder();
+  renderCanvas({ scenario, result: lastRunResult });
+  setFlash(`도면 기준점 후보 ${candidate.anchorId}를 시나리오 기준점으로 추가했습니다.`);
+}
+
+async function extractDrawingStructure() {
+  const input = document.querySelector("#drawing-svg-input");
+  const source = input?.value?.trim() ?? "";
+
+  if (!source) {
+    setFlash("SVG 도면 텍스트를 먼저 넣어 주세요.", true);
+    return;
+  }
+
+  saveDrawingSource();
+
+  const result = isLocalShellMode()
+    ? extractDrawingStructureFromSvg(source)
+    : await (async () => {
+        const response = await fetch("/api/engine/drawing/extract", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: stringify({
+            format: "svg",
+            source
+          })
+        });
+        const payload = await response.json();
+
+        if (!response.ok) {
+          throw new Error(payload.error ?? "도면 구조 추출에 실패했습니다.");
+        }
+
+        return payload;
+      })();
+
+  lastDrawingExtraction = result;
+  renderDrawingExtraction(result);
+  setFlash(`도면에서 기준점 후보 ${result.anchorCandidates.length}개를 찾았습니다.`);
 }
 
 function renderRatioSummary(scenario = parseScenario()) {
@@ -3405,6 +3545,7 @@ function init() {
   document.querySelector("#scenario-description-input").value =
     saved.metadata.description;
   document.querySelector("#engine-scenario-input").value = saved.scenarioText;
+  document.querySelector("#drawing-svg-input").value = loadDrawingSource();
   renderAnchorPresetUI();
   renderPlacementStatus();
   renderScenarioValidation(parseScenario());
@@ -3417,6 +3558,7 @@ function init() {
       setFlash("사진에서 실제로 보이는 대상의 위치를 누르세요.");
     });
   renderFormBuilder();
+  renderDrawingExtraction();
   renderCanvas({ scenario: parseScenario(), result: null });
   void loadReviewSession();
   void listSavedScenarios();
