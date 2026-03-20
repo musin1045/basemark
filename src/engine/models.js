@@ -138,3 +138,26 @@ export function createFieldEvidence(input) {
     imageRef: input.imageRef ?? null
   };
 }
+
+export function createMetricCalibration(input) {
+  if (input == null) {
+    return null;
+  }
+
+  assertObject(input, "metricCalibration");
+  assertArray(input.referenceAnchorBasis, "metricCalibration.referenceAnchorBasis");
+  assertFiniteNumber(input.knownDistanceMm, "metricCalibration.knownDistanceMm");
+
+  if (input.referenceAnchorBasis.length !== 2) {
+    throw new Error("metricCalibration.referenceAnchorBasis must contain exactly two anchor ids.");
+  }
+
+  for (const anchorId of input.referenceAnchorBasis) {
+    assertNonEmptyString(anchorId, "metricCalibration.referenceAnchorBasis[]");
+  }
+
+  return {
+    referenceAnchorBasis: [...input.referenceAnchorBasis],
+    knownDistanceMm: input.knownDistanceMm
+  };
+}

@@ -19,7 +19,7 @@
 - Identity note: the current repository mostly implements the operating layer; the comparison engine is not implemented yet.
 
 ## Current Repository State
-- Date: 2026-03-18
+- Date: 2026-03-20
 - Branch: `master`
 - Commit state: initial local-first foundation committed
 - App code: minimal Node foundation present
@@ -63,31 +63,31 @@
 - Keep local persistence on stable relative file references.
 
 ## Active Bounded Step
-- Step: make the local shell more app-like and add unattended soak automation
-- Why now: the repo currently has the operating layer for recording and preservation, so the next safe step in that layer is to improve hands-on testing flow while running long-lived local stability checks
+- Step: reshape the local shell toward a mobile-first field workflow while starting the first measurement-grade engine slice
+- Why now: the current browser shell proves engine and local workflow pieces, but it is still too much of a workbench; the accepted target is now a technician-facing mobile flow with one task per screen, and the most valuable missing engine capability is real-world length conversion
 - Out of scope:
   - implementing the full comparison engine in this bounded step
-  - database migrations
-  - drawing/map UI
-  - full application UI
   - cloud sync or distributed locking
+  - large framework migration
+  - full AR stack
+  - automatic final judgment
 
 ## Risks / Open Questions
 - The interactive shell is currently a thin browser-based operator shell, not a production mobile or desktop app.
+- The accepted mobile target is clearer than the current runtime shell, so there is still a gap between target UX and live UI.
 - Report generation currently emits Markdown summaries, not PDF output.
 - Backup restore uses import-as-new on project conflict; overwrite and merge modes are still intentionally absent.
 - Record mutation now uses optimistic compare-and-swap semantics, but there is still no cross-process file lock.
 - Long-running soak coverage currently exercises API workflow stability, not true autonomous code improvement.
+- Future overlay, measurement, and AR-like features need claim-level patent review and design-around checks before release.
 
 ## Next Smallest Step
-- Deepen operating-layer hardening without confusing it for the product core:
-  - expose checksum/restore failures more clearly in the web shell
-  - decide whether record documents should carry an explicit revision field in payloads
-  - add targeted corruption and partial-write recovery messaging to CLI/server responses
-  - continue reshaping the browser shell into a cleaner app-style test surface
-  - then return to printable report output or PDF generation
-- Separately define the first bounded slice of the comparison engine:
-  - drawing-grounded anchor contract
-  - normalized checkpoint coordinate contract
-  - local segment alignment contract
-  - candidate evidence contract
+- Move the current shell toward the accepted mobile target in bounded slices:
+  - add a mobile home screen with project status, quick actions, and item list
+  - separate add-item flow into a sequential form screen
+  - isolate review as its own screen
+  - keep advanced editor/debug surfaces hidden behind a secondary mode
+- In parallel, prepare the next engine-centered slice:
+  - keep known-length input and ratio-to-mm conversion in the core engine
+  - surface candidate output with real-world offset display in the UI
+  - then move to drawing parsing and anchor auto-suggestion as the next bounded vision slice

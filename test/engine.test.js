@@ -57,6 +57,10 @@ function createScenario() {
       evidenceId: "evidence-1",
       segmentId: "segment-door-left-wall",
       imageRef: "fixtures/door-left-wall.jpg"
+    },
+    metricCalibration: {
+      referenceAnchorBasis: ["anchor-left", "anchor-right"],
+      knownDistanceMm: 900
     }
   };
 }
@@ -79,6 +83,13 @@ test("alignLocalSegment projects normalized checkpoints into the field segment",
     y: 100
   });
   assert.equal(alignment.alignmentModel, "two_anchor_span_projection");
+  assert.equal(alignment.metricFrame.knownDistanceMm, 900);
+  assert.equal(alignment.metricFrame.spanPixels, 200);
+  assert.equal(alignment.metricFrame.millimetersPerPixel, 4.5);
+  assert.equal(
+    Number(alignment.projectedCheckpoints[0].metricProjection.distanceAlongSpanMm.toFixed(1)),
+    450
+  );
 });
 
 test("generateComparisonCandidates emits a missing candidate when no expected element is observed", () => {
@@ -108,6 +119,14 @@ test("generateComparisonCandidates emits a position_diff candidate when the obse
   assert.equal(result.candidates.length, 1);
   assert.equal(result.candidates[0].candidateType, "position_diff");
   assert.equal(result.candidates[0].reasonCode, "relative_offset_exceeds_tolerance");
+  assert.equal(
+    Number(result.candidates[0].metricOffset.offsetDistanceMm.toFixed(1)),
+    112.5
+  );
+  assert.deepEqual(result.candidates[0].metricOffset.offsetVectorMm, {
+    x: 112.5,
+    y: 0
+  });
 });
 
 test("generateComparisonCandidates emits an extra candidate for unmatched observed elements", () => {
