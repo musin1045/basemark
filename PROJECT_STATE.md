@@ -63,8 +63,8 @@
 - Keep local persistence on stable relative file references.
 
 ## Active Bounded Step
-- Step: reshape the local shell toward a mobile-first field workflow while starting the first measurement-grade engine slice
-- Why now: the current browser shell proves engine and local workflow pieces, but it is still too much of a workbench; the accepted target is now a technician-facing mobile flow with one task per screen, and the most valuable missing engine capability is real-world length conversion
+- Step: keep pushing the technician-facing mobile shell while closing the first practical automation slices around measurement, drawing parsing, and photo-side anchor suggestion
+- Why now: the shell is now close enough to a field app that the biggest missing value is not another generic UI pass, but reducing manual input with real-world length conversion, SVG drawing anchor extraction, and photo-side anchor suggestions that now need to cover more than just simple window corners
 - Out of scope:
   - implementing the full comparison engine in this bounded step
   - cloud sync or distributed locking
@@ -82,12 +82,12 @@
 - Future overlay, measurement, and AR-like features need claim-level patent review and design-around checks before release.
 
 ## Next Smallest Step
-- Move the current shell toward the accepted mobile target in bounded slices:
-  - add a mobile home screen with project status, quick actions, and item list
-  - separate add-item flow into a sequential form screen
-  - isolate review as its own screen
+- Keep moving the shell toward the accepted mobile target in bounded slices:
+  - reduce remaining workbench copy and encode the compare screen as a photo-first task flow
   - keep advanced editor/debug surfaces hidden behind a secondary mode
-- In parallel, prepare the next engine-centered slice:
-  - keep known-length input and ratio-to-mm conversion in the core engine
-  - surface candidate output with real-world offset display in the UI
-  - then move to drawing parsing and anchor auto-suggestion as the next bounded vision slice
+  - harden touch-first affordances for anchors, observed elements, and review
+- In parallel, keep advancing the engine-centered slices:
+  - preserve known-length input and ratio-to-mm conversion in the core engine
+  - keep SVG drawing parsing wired into UI anchor creation
+  - expand photo-side anchor suggestion from quadrant heuristics to stronger window and wall-corner suggestions, then door-frame suggestions
+  - then move to judgment assist, not automatic final judgment

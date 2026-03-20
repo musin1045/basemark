@@ -6,6 +6,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { BaseMarkService } from "../app/baseMarkService.js";
 import { generateComparisonCandidates } from "../engine/baseMarkEngine.js";
 import { extractDrawingStructureFromSvg } from "../engine/drawingStructureExtractor.js";
+import { suggestPhotoAnchorsFromImageData } from "../engine/photoAnchorSuggester.js";
 import { ReviewRepository } from "../engine/reviewRepository.js";
 import { EngineScenarioRepository } from "../engine/scenarioRepository.js";
 import { BaseMarkRepository } from "../storage/basemarkRepository.js";
@@ -165,6 +166,27 @@ async function handleApi(request, response, runtime, url) {
       extractDrawingStructureFromSvg(payload.source, {
         cornerTolerance: payload.cornerTolerance
       })
+    );
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/engine/photo/suggest-anchors") {
+    const payload = await readBody(request);
+
+    return sendJson(
+      response,
+      200,
+      suggestPhotoAnchorsFromImageData(
+        {
+          width: payload.imageData?.width,
+          height: payload.imageData?.height,
+          data: new Uint8ClampedArray(payload.imageData?.data ?? [])
+        },
+        {
+          step: payload.options?.step,
+          margin: payload.options?.margin,
+          minimumConfidence: payload.options?.minimumConfidence
+        }
+      )
     );
   }
 

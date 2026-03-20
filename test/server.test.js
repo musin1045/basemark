@@ -6,6 +6,42 @@ import path from "node:path";
 
 import { createBaseMarkServer } from "../src/server/basemarkServer.js";
 
+function createRectOutlineImagePayload(width, height, rect, fill = 245, shade = 20) {
+  const data = new Array(width * height * 4).fill(0);
+
+  for (let index = 0; index < width * height; index += 1) {
+    const rgbaIndex = index * 4;
+    data[rgbaIndex] = fill;
+    data[rgbaIndex + 1] = fill;
+    data[rgbaIndex + 2] = fill;
+    data[rgbaIndex + 3] = 255;
+  }
+
+  function paintPixel(x, y) {
+    const rgbaIndex = (y * width + x) * 4;
+    data[rgbaIndex] = shade;
+    data[rgbaIndex + 1] = shade;
+    data[rgbaIndex + 2] = shade;
+    data[rgbaIndex + 3] = 255;
+  }
+
+  for (let y = rect.top; y <= rect.bottom; y += 1) {
+    paintPixel(rect.left, y);
+    paintPixel(rect.right, y);
+  }
+
+  for (let x = rect.left; x <= rect.right; x += 1) {
+    paintPixel(x, rect.top);
+    paintPixel(x, rect.bottom);
+  }
+
+  return {
+    width,
+    height,
+    data
+  };
+}
+
 async function startServer(tempRoot) {
   const server = createBaseMarkServer({
     dataDir: path.join(tempRoot, "data")
@@ -256,6 +292,23 @@ test("Local server runs the workspace and record flow through HTTP routes", asyn
         })
       });
       const drawingExtract = await drawingExtractResponse.json();
+      const photoSuggestResponse = await fetch(`${baseUrl}/api/engine/photo/suggest-anchors`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          imageData: createRectOutlineImagePayload(120, 90, {
+            left: 20,
+            top: 15,
+            right: 100,
+            bottom: 75
+          }),
+          options: {
+            step: 2,
+            margin: 8
+          }
+        })
+      });
+      const photoSuggestions = await photoSuggestResponse.json();
       const saveScenarioResponse = await fetch(`${baseUrl}/api/engine/scenario/save`, {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -362,6 +415,15 @@ test("Local server runs the workspace and record flow through HTTP routes", asyn
       assert.equal(drawingExtractResponse.status, 200);
       assert.equal(drawingExtract.sourceFormat, "svg");
       assert.equal(drawingExtract.anchorCandidates.length >= 4, true);
+      assert.equal(photoSuggestResponse.status, 200);
+      assert.equal(
+        photoSuggestions.some((entry) => entry.anchorPresetKey === "window_left_top"),
+        true
+      );
+      assert.equal(
+        photoSuggestions.some((entry) => entry.anchorPresetKey === "wall_left_corner"),
+        true
+      );
       assert.equal(saveScenarioResponse.status, 200);
       assert.equal(savedScenario.id, "door-left-wall");
       assert.equal(scenarioList.length, 1);

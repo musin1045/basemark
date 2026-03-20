@@ -1,6 +1,7 @@
 import {
   createFieldEvidence,
   createLocalSegment,
+  createMetricCalibration,
   createNormalizedCheckpoint,
   createObservedElement,
   createStructuralAnchor
@@ -80,6 +81,43 @@ function createExpectedNeighborhood(projectedPoint, tolerance = {}) {
   };
 }
 
+function anchorBasisMatches(referenceAnchorBasis, activeAnchors) {
+  if (!referenceAnchorBasis || referenceAnchorBasis.length !== activeAnchors.length) {
+    return false;
+  }
+
+  const reference = [...referenceAnchorBasis].sort();
+  const active = activeAnchors.map((anchor) => anchor.anchorId).sort();
+  return reference.every((anchorId, index) => anchorId === active[index]);
+}
+
+function createMetricFrame(calibration, activeAnchors) {
+  if (!calibration) {
+    return null;
+  }
+
+  if (!anchorBasisMatches(calibration.referenceAnchorBasis, activeAnchors)) {
+    return null;
+  }
+
+  const spanPixels = distance(
+    activeAnchors[0].fieldObservation.point,
+    activeAnchors[1].fieldObservation.point
+  );
+
+  if (spanPixels === 0) {
+    return null;
+  }
+
+  return {
+    referenceAnchorBasis: [...calibration.referenceAnchorBasis],
+    knownDistanceMm: calibration.knownDistanceMm,
+    spanPixels,
+    millimetersPerPixel: calibration.knownDistanceMm / spanPixels,
+    pixelsPerMillimeter: spanPixels / calibration.knownDistanceMm
+  };
+}
+
 export function selectActiveAnchors(input) {
   const segment = createLocalSegment(input.segment);
   const anchors = (input.anchors ?? []).map(createStructuralAnchor);
@@ -105,6 +143,7 @@ export function alignLocalSegment(input) {
   const selection = selectActiveAnchors(input);
   const checkpoints = (input.checkpoints ?? []).map(createNormalizedCheckpoint);
   const fieldEvidence = createFieldEvidence(input.fieldEvidence);
+  const metricCalibration = createMetricCalibration(input.metricCalibration ?? null);
 
   if (fieldEvidence.segmentId !== selection.segment.segmentId) {
     throw new Error("fieldEvidence.segmentId must match the local segment.");
@@ -114,6 +153,7 @@ export function alignLocalSegment(input) {
     selection.activeAnchors.map((anchor) => anchor.anchorId)
   );
   const [anchorA, anchorB] = selection.activeAnchors;
+  const metricFrame = createMetricFrame(metricCalibration, selection.activeAnchors);
   const projectedCheckpoints = checkpoints
     .filter((checkpoint) => checkpoint.segmentId === selection.segment.segmentId)
     .map((checkpoint) => {
@@ -130,6 +170,22 @@ export function alignLocalSegment(input) {
         projectedPoint,
         checkpoint.allowedTolerance
       );
+      const metricProjection = metricFrame
+        ? {
+            distanceAlongSpanMm:
+              projectedPoint.anchorSpanLength *
+              (checkpoint.normalizedPosition.spanRatio ?? 0) *
+              metricFrame.millimetersPerPixel,
+            normalOffsetMm:
+              projectedPoint.anchorSpanLength *
+              (checkpoint.normalizedPosition.heightRatio ?? 0) *
+              metricFrame.millimetersPerPixel,
+            allowedRadiusMm:
+              expectedNeighborhood.allowedRadius * metricFrame.millimetersPerPixel,
+            searchRadiusMm:
+              expectedNeighborhood.searchRadius * metricFrame.millimetersPerPixel
+          }
+        : null;
 
       return {
         checkpointId: checkpoint.checkpointId,
@@ -144,7 +200,8 @@ export function alignLocalSegment(input) {
           x: projectedPoint.x,
           y: projectedPoint.y
         },
-        expectedNeighborhood
+        expectedNeighborhood,
+        metricProjection
       };
     });
 
@@ -153,6 +210,7 @@ export function alignLocalSegment(input) {
     fieldEvidence,
     activeAnchors: selection.activeAnchors,
     alignmentModel: "two_anchor_span_projection",
+    metricFrame,
     projectedCheckpoints,
     expectedNeighborhoods: projectedCheckpoints.map((entry) => ({
       checkpointId: entry.checkpointId,
@@ -200,6 +258,7 @@ export function generateComparisonCandidates(input) {
         activeAnchors: alignment.activeAnchors.map((anchor) => anchor.anchorId),
         normalizedBasis: projected.normalizedBasis,
         expectedLocation: projected.expectedNeighborhood,
+        metricLocation: projected.metricProjection,
         evidenceRegion: {
           evidenceId: alignment.fieldEvidence.evidenceId,
           center: projected.expectedNeighborhood.center,
@@ -214,6 +273,21 @@ export function generateComparisonCandidates(input) {
     matchedElementIds.add(nearest.element.elementId);
 
     if (nearest.distance > projected.expectedNeighborhood.allowedRadius) {
+      const offsetVectorPx = {
+        x: nearest.element.point.x - projected.projectedPoint.x,
+        y: nearest.element.point.y - projected.projectedPoint.y
+      };
+      const metricOffset = alignment.metricFrame
+        ? {
+            offsetDistanceMm:
+              nearest.distance * alignment.metricFrame.millimetersPerPixel,
+            offsetVectorMm: {
+              x: offsetVectorPx.x * alignment.metricFrame.millimetersPerPixel,
+              y: offsetVectorPx.y * alignment.metricFrame.millimetersPerPixel
+            }
+          }
+        : null;
+
       candidates.push({
         candidateId: `candidate-${projected.checkpointId}-position-diff`,
         candidateType: "position_diff",
@@ -226,6 +300,8 @@ export function generateComparisonCandidates(input) {
           observedPoint: nearest.element.point,
           observedElementId: nearest.element.elementId
         },
+        metricLocation: projected.metricProjection,
+        metricOffset,
         evidenceRegion: {
           evidenceId: alignment.fieldEvidence.evidenceId,
           center: projected.expectedNeighborhood.center,
@@ -250,6 +326,11 @@ export function generateComparisonCandidates(input) {
       activeAnchors: alignment.activeAnchors.map((anchor) => anchor.anchorId),
       normalizedBasis: null,
       expectedLocation: null,
+      metricLocation: alignment.metricFrame
+        ? {
+            evidenceRadiusMm: 24 * alignment.metricFrame.millimetersPerPixel
+          }
+        : null,
       evidenceRegion: {
         evidenceId: alignment.fieldEvidence.evidenceId,
         center: element.point,

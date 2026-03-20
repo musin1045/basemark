@@ -1,5 +1,6 @@
 import { generateComparisonCandidates } from "./engine/baseMarkEngine.js";
 import { extractDrawingStructureFromSvg } from "./engine/drawingStructureExtractor.js";
+import { suggestPhotoAnchorsFromImageData } from "./engine/photoAnchorSuggester.js";
 
 const STORAGE_KEY = "basemark.engine.scenario.v1";
 const SCENARIO_LIBRARY_KEY = "basemark.engine.scenario.library.v1";
@@ -111,10 +112,12 @@ let currentReviewSession = {
 };
 let selectedCandidateId = null;
 let lastDrawingExtraction = null;
+let lastPhotoAnchorSuggestions = [];
 let cameraStream = null;
 let placementMode = "none";
 let selectedBuilderEntity = null;
 let selectedAnchorPreset = "window_left_top";
+let lastCanvasProjector = null;
 
 function stringify(value) {
   return JSON.stringify(value, null, 2);
@@ -228,6 +231,91 @@ function saveDrawingSource() {
   }
 
   localStorage.setItem(DRAWING_SOURCE_KEY, input.value);
+}
+
+function getRenderableVisualMedia() {
+  const still = document.querySelector("#visual-still");
+  if (
+    still &&
+    !still.classList.contains("is-hidden") &&
+    typeof still.naturalWidth === "number" &&
+    still.naturalWidth > 0
+  ) {
+    return still;
+  }
+
+  const video = document.querySelector("#visual-video");
+  if (
+    video &&
+    !video.classList.contains("is-hidden") &&
+    typeof video.videoWidth === "number" &&
+    video.videoWidth > 0 &&
+    video.readyState >= 2
+  ) {
+    return video;
+  }
+
+  return null;
+}
+
+function drawMediaCover(context, media, width, height) {
+  const sourceWidth = media.videoWidth || media.naturalWidth || width;
+  const sourceHeight = media.videoHeight || media.naturalHeight || height;
+  const scale = Math.max(width / sourceWidth, height / sourceHeight);
+  const drawWidth = sourceWidth * scale;
+  const drawHeight = sourceHeight * scale;
+  const offsetX = (width - drawWidth) / 2;
+  const offsetY = (height - drawHeight) / 2;
+
+  context.clearRect(0, 0, width, height);
+  context.drawImage(media, offsetX, offsetY, drawWidth, drawHeight);
+}
+
+function captureRenderedMediaImageData(width, height) {
+  const media = getRenderableVisualMedia();
+  if (!media) {
+    throw new Error("사진이나 카메라 화면이 있어야 자동 추천을 실행할 수 있습니다.");
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  drawMediaCover(context, media, width, height);
+
+  return context.getImageData(0, 0, width, height);
+}
+
+function renderPhotoAnchorSuggestions() {
+  const root = document.querySelector("#photo-anchor-suggestions");
+  if (!root) {
+    return;
+  }
+
+  if (!lastPhotoAnchorSuggestions.length) {
+    root.innerHTML =
+      '<p class="empty-state">사진을 올리거나 카메라를 켠 뒤 자동 추천을 실행하면 기준점 후보가 여기에 표시됩니다.</p>';
+    return;
+  }
+
+  root.innerHTML = "";
+
+  for (const suggestion of lastPhotoAnchorSuggestions) {
+    const card = document.createElement("article");
+    card.className = "candidate-card drawing-anchor-card photo-anchor-card";
+    card.innerHTML = `
+      <strong>${suggestion.label}</strong>
+      <p>추천 위치: (${suggestion.point.x}, ${suggestion.point.y})</p>
+      <p>신뢰도: ${Math.round(suggestion.confidence * 100)}%</p>
+      <div class="form-card-actions">
+        <button type="button" data-photo-suggestion-apply="${suggestion.suggestionId}">이 기준점 적용</button>
+      </div>
+    `;
+    card.querySelector("button").addEventListener("click", () => {
+      applyPhotoAnchorSuggestion(suggestion.suggestionId);
+    });
+    root.appendChild(card);
+  }
 }
 
 function renderPlacementStatus() {
@@ -1369,6 +1457,8 @@ async function startCamera() {
   video.srcObject = cameraStream;
   video.classList.remove("is-hidden");
   still.classList.add("is-hidden");
+  lastPhotoAnchorSuggestions = [];
+  renderPhotoAnchorSuggestions();
   await video.play();
 }
 
@@ -1402,6 +1492,70 @@ function captureCameraFrame() {
   context.drawImage(video, 0, 0, canvas.width, canvas.height);
   still.src = canvas.toDataURL("image/png");
   still.classList.remove("is-hidden");
+  lastPhotoAnchorSuggestions = [];
+  renderPhotoAnchorSuggestions();
+}
+
+function handlePhotoUpload(file) {
+  const still = document.querySelector("#visual-still");
+  const video = document.querySelector("#visual-video");
+  if (!file) {
+    return;
+  }
+
+  stopCamera();
+  const nextUrl = URL.createObjectURL(file);
+  still.onload = () => {
+    URL.revokeObjectURL(nextUrl);
+    still.onload = null;
+    renderCanvas({ scenario: parseScenario(), result: lastRunResult });
+  };
+  still.src = nextUrl;
+  still.classList.remove("is-hidden");
+  video.classList.add("is-hidden");
+  updateScenario((draft) => {
+    draft.fieldEvidence.imageRef = file.name;
+  });
+  lastPhotoAnchorSuggestions = [];
+  renderPhotoAnchorSuggestions();
+  setFlash("사진을 불러왔습니다. 이제 기준점 자동 추천이나 수동 찍기를 진행할 수 있습니다.");
+}
+
+function suggestPhotoAnchors() {
+  const scenario = parseScenario();
+  const currentStage = stage ?? createStage();
+  const projector = lastCanvasProjector ?? createProjector([], currentStage.width(), currentStage.height());
+  const imageData = captureRenderedMediaImageData(currentStage.width(), currentStage.height());
+  const suggestions = suggestPhotoAnchorsFromImageData(imageData);
+
+  lastPhotoAnchorSuggestions = suggestions.map((entry) => ({
+    ...entry,
+    displayPoint: entry.point,
+    scenarioPoint: projector.invert(entry.point)
+  }));
+  renderPhotoAnchorSuggestions();
+  renderCanvas({ scenario, result: lastRunResult });
+
+  if (!lastPhotoAnchorSuggestions.length) {
+    setFlash("뚜렷한 프레임 모서리를 찾지 못했습니다. 사진을 바꾸거나 수동으로 기준점을 찍어주세요.", true);
+    return;
+  }
+
+  setFlash(`자동 기준점 후보 ${lastPhotoAnchorSuggestions.length}개를 찾았습니다. 맞는 후보를 눌러 바로 적용해보세요.`);
+}
+
+function applyPhotoAnchorSuggestion(suggestionId) {
+  const suggestion = lastPhotoAnchorSuggestions.find(
+    (entry) => entry.suggestionId === suggestionId
+  );
+
+  if (!suggestion) {
+    throw new Error("선택한 자동 기준점 후보를 찾지 못했습니다.");
+  }
+
+  selectedAnchorPreset = suggestion.anchorPresetKey;
+  renderAnchorPresetUI();
+  addAnchorAtPoint(suggestion.scenarioPoint);
 }
 
 function applyDraggedPoint(kind, index, point) {
@@ -1993,6 +2147,33 @@ function bindEvents() {
     });
 
   document
+    .querySelector("[data-action='open-photo-upload']")
+    .addEventListener("click", () => {
+      document.querySelector("#photo-upload-input")?.click();
+    });
+
+  document.querySelector("#photo-upload-input").addEventListener("change", (event) => {
+    const file = event.target.files?.[0];
+    try {
+      handlePhotoUpload(file);
+    } catch (error) {
+      setFlash(error.message, true);
+    } finally {
+      event.target.value = "";
+    }
+  });
+
+  for (const button of document.querySelectorAll("[data-action='suggest-photo-anchors']")) {
+    button.addEventListener("click", () => {
+      try {
+        suggestPhotoAnchors();
+      } catch (error) {
+        setFlash(error.message, true);
+      }
+    });
+  }
+
+  document
     .querySelector("[data-action='start-camera']")
     .addEventListener("click", async () => {
       try {
@@ -2087,6 +2268,8 @@ function bindEvents() {
         scenarioId: "door-left-wall",
         reviews: []
       };
+      lastPhotoAnchorSuggestions = [];
+      renderPhotoAnchorSuggestions();
       setPlacementMode("none");
       resetOutputPanels();
       setFlash("Reset to the default scenario.");
@@ -2946,8 +3129,32 @@ function renderCanvas({ scenario, result }) {
     currentStage.width(),
     currentStage.height()
   );
+  lastCanvasProjector = projector;
 
   layer.add(background);
+
+  for (const suggestion of lastPhotoAnchorSuggestions) {
+    const point = suggestion.displayPoint;
+    layer.add(
+      new window.Konva.Circle({
+        x: point.x,
+        y: point.y,
+        radius: 16,
+        stroke: "#059669",
+        strokeWidth: 3,
+        dash: [6, 5]
+      })
+    );
+    layer.add(
+      new window.Konva.Circle({
+        x: point.x,
+        y: point.y,
+        radius: 4,
+        fill: "#059669"
+      })
+    );
+    drawLabel(layer, `추천 ${suggestion.shortLabel}`, point, "#059669");
+  }
 
   const anchorPoints = (scenario.anchors ?? []).map((anchor, index) => ({
     anchor,
@@ -3551,6 +3758,7 @@ function init() {
   renderScenarioValidation(parseScenario());
   renderMetrics();
   resetOutputPanels();
+  renderPhotoAnchorSuggestions();
   bindEvents();
   document
     .querySelector("[data-action='place-observed']")
