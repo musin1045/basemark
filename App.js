@@ -1,77 +1,54 @@
-import 'react-native-gesture-handler';
-import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { createStackNavigator } from '@react-navigation/stack';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Text } from 'react-native';
-
 import HomeScreen from './src/screens/HomeScreen';
 import InputScreen from './src/screens/InputScreen';
 import SiteScreen from './src/screens/SiteScreen';
 import SettleScreen from './src/screens/SettleScreen';
 
 const Tab = createBottomTabNavigator();
-const Stack = createStackNavigator();
+const Stack = createNativeStackNavigator();
 
-const COLORS = {
-  primary: '#0C447C',
-  mid: '#185FA5',
-};
-
-// Icons (text-based for no-dependency approach)
-function TabIcon({ label, active }) {
-  const icons = { 달력: '📅', 공수: '✏️', 정산: '💰', 설정: '⚙️' };
-  return <Text style={{ fontSize: 20 }}>{icons[label] || '●'}</Text>;
-}
-
-// Home stack (Calendar + Input)
-function HomeStack() {
+function HomeTabs() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="Home" component={HomeScreen} />
-      <Stack.Screen
-        name="Input"
-        component={InputScreen}
-        options={{ presentation: 'modal' }}
+    <Tab.Navigator
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: '#185FA5',
+        tabBarInactiveTintColor: '#888780',
+        tabBarStyle: { borderTopWidth: 0.5, borderTopColor: '#ddd' },
+      }}>
+      <Tab.Screen
+        name="달력"
+        component={HomeScreen}
+        options={{ tabBarIcon: ({ color }) => <Text style={{ fontSize: 18, color }}>▦</Text> }}
       />
-      <Stack.Screen
-        name="Sites"
+      <Tab.Screen
+        name="현장"
         component={SiteScreen}
-        options={{ presentation: 'modal' }}
+        options={{ tabBarIcon: ({ color }) => <Text style={{ fontSize: 18, color }}>◈</Text> }}
       />
-    </Stack.Navigator>
+      <Tab.Screen
+        name="정산"
+        component={SettleScreen}
+        options={{ tabBarIcon: ({ color }) => <Text style={{ fontSize: 18, color }}>◎</Text> }}
+      />
+    </Tab.Navigator>
   );
 }
 
 export default function App() {
   return (
     <NavigationContainer>
-      <Tab.Navigator
-        screenOptions={({ route }) => ({
-          headerShown: false,
-          tabBarActiveTintColor: COLORS.mid,
-          tabBarInactiveTintColor: '#AAA',
-          tabBarStyle: {
-            borderTopWidth: 1,
-            borderTopColor: '#E8E8E8',
-            height: 60,
-            paddingBottom: 6,
-          },
-          tabBarLabelStyle: { fontSize: 12, fontWeight: '700' },
-          tabBarIcon: ({ focused }) => (
-            <TabIcon label={route.name} active={focused} />
-          ),
-        })}
-      >
-        <Tab.Screen name="달력" component={HomeStack} />
-        <Tab.Screen
-          name="공수"
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="Main" component={HomeTabs} />
+        <Stack.Screen
+          name="Input"
           component={InputScreen}
-          initialParams={{ date: new Date().toISOString().slice(0, 10) }}
+          options={{ presentation: 'modal' }}
         />
-        <Tab.Screen name="정산" component={SettleScreen} />
-        <Tab.Screen name="설정" component={SiteScreen} />
-      </Tab.Navigator>
+      </Stack.Navigator>
     </NavigationContainer>
   );
 }
