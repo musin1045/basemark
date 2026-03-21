@@ -1,24 +1,32 @@
 {
-  "name": "basemark",
-  "version": "0.1.0",
-  "private": true,
-  "type": "module",
-  "description": "BaseMark local-first foundation",
+  "name": "gongsu-app",
+  "version": "1.0.0",
+  "main": "App.js",
   "scripts": {
-    "test": "node --test --test-isolation=none",
-    "cli": "node src/cli/basemarkCli.js",
-    "app": "node src/server/basemarkServer.js",
-    "soak": "node scripts/soak_local_app.mjs",
-    "android:sync": "npx cap sync android",
-    "android:run": "npx cap run android"
-  },
-  "engines": {
-    "node": ">=24"
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web"
   },
   "dependencies": {
-    "@capacitor/android": "^8.2.0",
-    "@capacitor/cli": "^8.2.0",
-    "@capacitor/core": "^8.2.0",
-    "konva": "^10.2.3"
-  }
+    "@react-navigation/bottom-tabs": "^6.6.1",
+    "@react-navigation/native": "^6.1.18",
+    "@react-navigation/native-stack": "^6.9.26",
+    "@react-navigation/stack": "^6.4.1",
+    "expo": "~52.0.0",
+    "expo-asset": "^55.0.10",
+    "expo-print": "~13.0.0",
+    "expo-sharing": "~13.0.0",
+    "expo-sqlite": "~15.0.0",
+    "expo-status-bar": "~2.0.0",
+    "react": "18.3.1",
+    "react-native": "0.76.5",
+    "react-native-gesture-handler": "~2.20.2",
+    "react-native-safe-area-context": "^4.12.0",
+    "react-native-screens": "~4.4.0"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.2"
+  },
+  "private": true
 }

@@ -1,0 +1,34 @@
+{
+  "expo": {
+    "name": "공수앱",
+    "slug": "gongsu-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#0C447C"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.gongsu.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0C447C"
+      },
+      "package": "com.gongsu.app"
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "plugins": [
+      [
+        "expo-sqlite",
+        {
+          "enableFTS": false
+        }
+      ]
+    ]
+  }
+}
