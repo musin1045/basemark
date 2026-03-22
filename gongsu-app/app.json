@@ -32,6 +32,9 @@
       "favicon": "./assets/favicon.png"
     },
     "extra": {
+      "eas": {
+        "projectId": ""
+      },
       "releaseChannel": "codex/gosu",
       "updateManifestUrl": "https://github.com/musin1045/basemark/raw/main/gongsu-app/update-manifest.json",
       "privacyPolicyUrl": "https://github.com/musin1045/basemark/blob/main/gongsu-app/privacy-policy.md"
