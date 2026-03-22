@@ -1,5 +1,6 @@
 import 'react-native-gesture-handler';
 
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -39,13 +40,28 @@ function HomeTabs() {
     SettleTab: '\uC815\uC0B0',
     SettingsTab: '\uC124\uC815',
   };
+  const tabIcons = {
+    HomeTab: ['calendar-outline', 'calendar'],
+    SitesTab: ['location-outline', 'location'],
+    SettleTab: ['wallet-outline', 'wallet'],
+    SettingsTab: ['settings-outline', 'settings'],
+  };
 
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarShowIcon: false,
-        tabBarIcon: () => null,
+        tabBarShowIcon: true,
+        tabBarIcon: ({ focused, color }) => {
+          const [inactiveIcon, activeIcon] = tabIcons[route.name] ?? ['ellipse-outline', 'ellipse'];
+          return (
+            <Ionicons
+              name={focused ? activeIcon : inactiveIcon}
+              size={22}
+              color={color}
+            />
+          );
+        },
         tabBarActiveTintColor: COLORS.primary,
         tabBarInactiveTintColor: COLORS.textMuted,
         tabBarStyle: {
@@ -65,7 +81,7 @@ function HomeTabs() {
           fontWeight: '700',
           lineHeight: 18,
           includeFontPadding: false,
-          marginTop: -10,
+          marginTop: 2,
           marginBottom: 0,
           paddingBottom: 0,
         },

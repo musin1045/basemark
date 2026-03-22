@@ -1,4 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import {
   ActivityIndicator,
   ScrollView,
@@ -214,11 +215,11 @@ export default function HomeScreen({ navigation }) {
         <View style={styles.headerTop}>
           <View style={styles.monthSwitcher}>
             <TouchableOpacity onPress={previousMonth} style={styles.navButton}>
-              <Text style={styles.navButtonText}>{'<'}</Text>
+              <Ionicons name="chevron-back" size={22} color="#FFFFFF" />
             </TouchableOpacity>
             <Text style={styles.headerTitle}>{formatMonthLabel(year, month)}</Text>
             <TouchableOpacity onPress={nextMonth} style={styles.navButton}>
-              <Text style={styles.navButtonText}>{'>'}</Text>
+              <Ionicons name="chevron-forward" size={22} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
 
