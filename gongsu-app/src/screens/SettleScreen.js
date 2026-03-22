@@ -1,5 +1,6 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   ScrollView,
   StatusBar,
@@ -160,20 +161,61 @@ export default function SettleScreen() {
   const [rangeEndInput, setRangeEndInput] = useState(initialRange.end);
   const [dateMap, setDateMap] = useState({});
   const [deductionRateInput, setDeductionRateInput] = useState('0');
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [processingDate, setProcessingDate] = useState(null);
+  const [isBulkUpdating, setIsBulkUpdating] = useState(false);
+  const rangeRef = useRef({
+    start: initialRange.start,
+    end: initialRange.end,
+  });
+  const loadRequestIdRef = useRef(0);
 
-  const loadDataForRange = useCallback(async (startDate, endDate) => {
-    const records = await getRecordsByDateRange(startDate, endDate);
-    setDateMap(groupByDate(records));
+  const loadDataForRange = useCallback(async (startDate, endDate, options = {}) => {
+    const { notifyOnError = false } = options;
+    const requestId = loadRequestIdRef.current + 1;
+    loadRequestIdRef.current = requestId;
+    setIsLoading(true);
+    setErrorMessage('');
+
+    try {
+      const records = await getRecordsByDateRange(startDate, endDate);
+      if (loadRequestIdRef.current !== requestId) {
+        return false;
+      }
+
+      setDateMap(groupByDate(records));
+      return true;
+    } catch (error) {
+      if (loadRequestIdRef.current !== requestId) {
+        return false;
+      }
+
+      const nextMessage =
+        String(error?.message ?? '').trim() || '정산 데이터를 불러오지 못했습니다.';
+      setErrorMessage(nextMessage);
+
+      if (notifyOnError) {
+        Alert.alert('정산 불러오기 실패', nextMessage);
+      }
+
+      return false;
+    } finally {
+      if (loadRequestIdRef.current === requestId) {
+        setIsLoading(false);
+      }
+    }
   }, []);
 
-  const loadData = useCallback(async () => {
-    await loadDataForRange(rangeStart, rangeEnd);
-  }, [loadDataForRange, rangeEnd, rangeStart]);
+  rangeRef.current = {
+    start: rangeStart,
+    end: rangeEnd,
+  };
 
   useFocusEffect(
     useCallback(() => {
-      loadData();
-    }, [loadData])
+      void loadDataForRange(rangeRef.current.start, rangeRef.current.end);
+    }, [loadDataForRange])
   );
 
   const entries = useMemo(
@@ -250,6 +292,8 @@ export default function SettleScreen() {
     return [...map.values()].sort((left, right) => right.totalAmount - left.totalAmount);
   }, [entries]);
 
+  const isBusy = isLoading || isBulkUpdating || Boolean(processingDate);
+
   const applyRange = async (startDate, endDate) => {
     if (!isValidDateKey(startDate) || !isValidDateKey(endDate)) {
       Alert.alert('날짜 형식을 확인해 주세요', '시작일과 종료일은 YYYY-MM-DD 형식으로 입력해 주세요.');
@@ -265,7 +309,9 @@ export default function SettleScreen() {
     setRangeEnd(endDate);
     setRangeStartInput(startDate);
     setRangeEndInput(endDate);
-    await loadDataForRange(startDate, endDate);
+    await loadDataForRange(startDate, endDate, {
+      notifyOnError: true,
+    });
   };
 
   const moveRangeByMonth = async (delta) => {
@@ -285,13 +331,35 @@ export default function SettleScreen() {
   };
 
   const toggleSettled = async (date, currentValue) => {
-    await setSettled(date, !currentValue);
-    await loadData();
+    if (isBusy) {
+      return;
+    }
+
+    setProcessingDate(date);
+    setErrorMessage('');
+
+    try {
+      await setSettled(date, !currentValue);
+      await loadDataForRange(rangeStart, rangeEnd, {
+        notifyOnError: true,
+      });
+    } catch (error) {
+      const nextMessage =
+        String(error?.message ?? '').trim() || '정산 상태를 변경하지 못했습니다.';
+      setErrorMessage(nextMessage);
+      Alert.alert('정산 변경 실패', nextMessage);
+    } finally {
+      setProcessingDate(null);
+    }
   };
 
   const handleBulkUpdate = (nextSettled) => {
     if (entries.length === 0) {
       Alert.alert('정산할 내용이 없습니다', '먼저 기록을 입력한 뒤 다시 시도해 주세요.');
+      return;
+    }
+
+    if (isBusy) {
       return;
     }
 
@@ -303,8 +371,22 @@ export default function SettleScreen() {
         {
           text: nextSettled ? '정산 완료' : '미정산으로 변경',
           onPress: async () => {
-            await setSettledByDateRange(rangeStart, rangeEnd, nextSettled);
-            await loadData();
+            setIsBulkUpdating(true);
+            setErrorMessage('');
+
+            try {
+              await setSettledByDateRange(rangeStart, rangeEnd, nextSettled);
+              await loadDataForRange(rangeStart, rangeEnd, {
+                notifyOnError: true,
+              });
+            } catch (error) {
+              const nextMessage =
+                String(error?.message ?? '').trim() || '일괄 정산 상태를 변경하지 못했습니다.';
+              setErrorMessage(nextMessage);
+              Alert.alert('일괄 정산 실패', nextMessage);
+            } finally {
+              setIsBulkUpdating(false);
+            }
           },
         },
       ]
@@ -418,11 +500,19 @@ export default function SettleScreen() {
 
       <View style={styles.header}>
         <View style={styles.headerTop}>
-          <TouchableOpacity onPress={() => moveRangeByMonth(-1)} style={styles.headerButton}>
+          <TouchableOpacity
+            onPress={() => moveRangeByMonth(-1)}
+            style={[styles.headerButton, isBusy && styles.touchDisabled]}
+            disabled={isBusy}
+          >
             <Text style={styles.headerButtonText}>{'<'}</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>{rangeTitle}</Text>
-          <TouchableOpacity onPress={() => moveRangeByMonth(1)} style={styles.headerButton}>
+          <TouchableOpacity
+            onPress={() => moveRangeByMonth(1)}
+            style={[styles.headerButton, isBusy && styles.touchDisabled]}
+            disabled={isBusy}
+          >
             <Text style={styles.headerButtonText}>{'>'}</Text>
           </TouchableOpacity>
         </View>
@@ -436,6 +526,7 @@ export default function SettleScreen() {
           <TouchableOpacity
             style={[styles.pill, styles.pillTouchable, { backgroundColor: COLORS.settledBg }]}
             onPress={() => handleBulkUpdate(true)}
+            disabled={isBusy || entries.length === 0}
           >
             <Text style={[styles.pillText, { color: COLORS.settled }]}>
               정산 완료 {formatMoney(totals.settledAmount)}
@@ -444,6 +535,7 @@ export default function SettleScreen() {
           <TouchableOpacity
             style={[styles.pill, styles.pillTouchable, { backgroundColor: COLORS.unsettledBg }]}
             onPress={() => handleBulkUpdate(false)}
+            disabled={isBusy || entries.length === 0}
           >
             <Text style={[styles.pillText, { color: COLORS.unsettled }]}>
               미정산 {formatMoney(totals.unsettledAmount)}
@@ -457,6 +549,20 @@ export default function SettleScreen() {
         contentContainerStyle={styles.bodyContent}
         showsVerticalScrollIndicator={false}
       >
+        {isLoading ? (
+          <View style={styles.feedbackCard}>
+            <ActivityIndicator size="small" color={COLORS.primary} />
+            <Text style={styles.feedbackText}>정산 데이터를 불러오는 중입니다.</Text>
+          </View>
+        ) : null}
+
+        {errorMessage ? (
+          <View style={[styles.feedbackCard, styles.feedbackCardError]}>
+            <Text style={styles.feedbackErrorTitle}>불러오기 또는 변경 중 문제가 생겼습니다.</Text>
+            <Text style={styles.feedbackErrorText}>{errorMessage}</Text>
+          </View>
+        ) : null}
+
         <View style={styles.deductionCard}>
           <Text style={styles.deductionTitle}>세금/공제 계산</Text>
 
@@ -548,10 +654,18 @@ export default function SettleScreen() {
           <View style={styles.rangeHeaderRow}>
             <Text style={styles.rangeTitle}>기간 지정</Text>
             <View style={styles.rangePresetRow}>
-              <TouchableOpacity style={styles.rangePresetButton} onPress={resetToPreviousMonth}>
+              <TouchableOpacity
+                style={[styles.rangePresetButton, isBusy && styles.touchDisabled]}
+                onPress={resetToPreviousMonth}
+                disabled={isBusy}
+              >
                 <Text style={styles.rangePresetButtonText}>지난달</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.rangePresetButton} onPress={resetToCurrentMonth}>
+              <TouchableOpacity
+                style={[styles.rangePresetButton, isBusy && styles.touchDisabled]}
+                onPress={resetToCurrentMonth}
+                disabled={isBusy}
+              >
                 <Text style={styles.rangePresetButtonText}>이번 달</Text>
               </TouchableOpacity>
             </View>
@@ -570,6 +684,7 @@ export default function SettleScreen() {
                 autoCapitalize="none"
                 autoCorrect={false}
                 maxLength={10}
+                editable={!isBusy}
               />
             </View>
 
@@ -587,13 +702,15 @@ export default function SettleScreen() {
                 autoCapitalize="none"
                 autoCorrect={false}
                 maxLength={10}
+                editable={!isBusy}
               />
             </View>
           </View>
 
           <TouchableOpacity
-            style={styles.rangeApplyButton}
+            style={[styles.rangeApplyButton, isBusy && styles.touchDisabled]}
             onPress={() => applyRange(rangeStartInput, rangeEndInput)}
+            disabled={isBusy}
           >
             <Text style={styles.rangeApplyButtonText}>기간 적용</Text>
           </TouchableOpacity>
@@ -601,14 +718,16 @@ export default function SettleScreen() {
 
         <View style={styles.bulkActionRow}>
           <TouchableOpacity
-            style={[styles.bulkActionButton, styles.bulkActionPrimary]}
+            style={[styles.bulkActionButton, styles.bulkActionPrimary, isBusy && styles.touchDisabled]}
             onPress={() => handleBulkUpdate(true)}
+            disabled={isBusy || entries.length === 0}
           >
             <Text style={styles.bulkActionPrimaryText}>일괄 정산 완료</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.bulkActionButton, styles.bulkActionSecondary]}
+            style={[styles.bulkActionButton, styles.bulkActionSecondary, isBusy && styles.touchDisabled]}
             onPress={() => handleBulkUpdate(false)}
+            disabled={isBusy || entries.length === 0}
           >
             <Text style={styles.bulkActionSecondaryText}>일괄 미정산</Text>
           </TouchableOpacity>
@@ -646,9 +765,14 @@ export default function SettleScreen() {
             entries.map((entry) => (
               <TouchableOpacity
                 key={entry.date}
-                style={styles.entryCard}
+                style={[
+                  styles.entryCard,
+                  processingDate === entry.date && styles.entryCardPending,
+                  isBusy && processingDate !== entry.date && styles.touchDisabled,
+                ]}
                 activeOpacity={0.82}
                 onPress={() => toggleSettled(entry.date, entry.isSettled)}
+                disabled={isBusy}
               >
                 <View style={styles.entryInfo}>
                   <View style={styles.entryHeaderRow}>
@@ -699,7 +823,11 @@ export default function SettleScreen() {
         </View>
 
         {entries.length > 0 ? (
-          <TouchableOpacity style={styles.exportButton} onPress={exportPdf}>
+          <TouchableOpacity
+            style={[styles.exportButton, isBusy && styles.touchDisabled]}
+            onPress={exportPdf}
+            disabled={isBusy}
+          >
             <Text style={styles.exportButtonText}>선택 기간 정산 PDF 내보내기</Text>
           </TouchableOpacity>
         ) : null}
@@ -773,6 +901,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.18)',
   },
+  touchDisabled: {
+    opacity: 0.55,
+  },
   pillText: {
     fontSize: 12,
     fontWeight: '800',
@@ -784,6 +915,39 @@ const styles = StyleSheet.create({
   bodyContent: {
     padding: 16,
     gap: 16,
+  },
+  feedbackCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: COLORS.surface,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  feedbackCardError: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+    gap: 4,
+    borderColor: '#E8B4B4',
+    backgroundColor: '#FFF5F5',
+  },
+  feedbackText: {
+    color: COLORS.text,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  feedbackErrorTitle: {
+    color: '#A53B3B',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  feedbackErrorText: {
+    color: '#8B4A4A',
+    fontSize: 12,
+    lineHeight: 18,
   },
   deductionCard: {
     backgroundColor: COLORS.surface,
@@ -1071,6 +1235,9 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     padding: 16,
     gap: 14,
+  },
+  entryCardPending: {
+    borderColor: COLORS.primary,
   },
   entryInfo: {
     gap: 4,

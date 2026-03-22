@@ -51,6 +51,24 @@ test('parseBackupJsonText accepts json5-style backup text', () => {
   assert.equal(payload.records[0].dailyRate, 230000);
 });
 
+test('normalizeBackupImport returns empty arrays for null payloads', () => {
+  const normalized = normalizeBackupImport(null);
+
+  assert.deepEqual(normalized, {
+    sites: [],
+    records: [],
+  });
+});
+
+test('normalizeBackupImport returns empty arrays for empty objects', () => {
+  const normalized = normalizeBackupImport({});
+
+  assert.deepEqual(normalized, {
+    sites: [],
+    records: [],
+  });
+});
+
 test('normalizeBackupImport reads wrapped foreign app backups with date maps', () => {
   const normalized = normalizeBackupImport({
     backupData: {
