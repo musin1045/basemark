@@ -5,6 +5,7 @@ import {
   StatusBar,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -14,10 +15,10 @@ import * as Sharing from 'expo-sharing';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
-  getRecordsByMonth,
+  getRecordsByDateRange,
   groupByDate,
   setSettled,
-  setSettledByMonth,
+  setSettledByDateRange,
 } from '../db/db';
 import {
   escapeHtml,
@@ -26,6 +27,104 @@ import {
   formatMonthLabel,
 } from '../lib/formatters';
 import { COLORS } from '../lib/theme';
+
+const DEDUCTION_PRESETS = [
+  { key: 'none', label: '공제 없음', rate: 0 },
+  { key: 'dayworker', label: '일용직 3.3%', rate: 3.3 },
+  { key: 'insurance', label: '4대보험 9.4%', rate: 9.4 },
+];
+
+function pad(value) {
+  return String(value).padStart(2, '0');
+}
+
+function getMonthRange(year, month) {
+  const lastDay = new Date(year, month, 0).getDate();
+
+  return {
+    start: `${year}-${pad(month)}-01`,
+    end: `${year}-${pad(month)}-${pad(lastDay)}`,
+  };
+}
+
+function getCurrentMonthRange() {
+  const today = new Date();
+  return getMonthRange(today.getFullYear(), today.getMonth() + 1);
+}
+
+function shiftMonthRange(dateKey, delta) {
+  const [year, month] = String(dateKey).split('-').map(Number);
+  const shifted = new Date(year, month - 1 + delta, 1);
+  return getMonthRange(shifted.getFullYear(), shifted.getMonth() + 1);
+}
+
+function formatDateInput(value) {
+  const digits = String(value ?? '')
+    .replace(/[^\d]/g, '')
+    .slice(0, 8);
+
+  if (digits.length <= 4) {
+    return digits;
+  }
+
+  if (digits.length <= 6) {
+    return `${digits.slice(0, 4)}-${digits.slice(4)}`;
+  }
+
+  return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6)}`;
+}
+
+function formatPercentInput(value) {
+  const sanitized = String(value ?? '').replace(/[^0-9.]/g, '');
+  const [integerPart = '', ...decimalParts] = sanitized.split('.');
+
+  if (decimalParts.length === 0) {
+    return integerPart;
+  }
+
+  return `${integerPart}.${decimalParts.join('').slice(0, 2)}`;
+}
+
+function isValidDateKey(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value ?? ''))) {
+    return false;
+  }
+
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+
+  return (
+    date.getFullYear() === year &&
+    date.getMonth() === month - 1 &&
+    date.getDate() === day
+  );
+}
+
+function isWholeMonthRange(startDate, endDate) {
+  if (!isValidDateKey(startDate) || !isValidDateKey(endDate)) {
+    return false;
+  }
+
+  const [startYear, startMonth, startDay] = startDate.split('-').map(Number);
+  const [endYear, endMonth, endDay] = endDate.split('-').map(Number);
+  const lastDay = new Date(endYear, endMonth, 0).getDate();
+
+  return (
+    startYear === endYear &&
+    startMonth === endMonth &&
+    startDay === 1 &&
+    endDay === lastDay
+  );
+}
+
+function getRangeTitle(startDate, endDate) {
+  if (isWholeMonthRange(startDate, endDate)) {
+    const [year, month] = startDate.split('-').map(Number);
+    return formatMonthLabel(year, month);
+  }
+
+  return `${startDate} ~ ${endDate}`;
+}
 
 function getEntrySiteSummary(entry) {
   if (!entry?.items?.length) {
@@ -53,14 +152,23 @@ function getEntrySiteSummary(entry) {
 
 export default function SettleScreen() {
   const today = new Date();
-  const [year, setYear] = useState(today.getFullYear());
-  const [month, setMonth] = useState(today.getMonth() + 1);
+  const initialRange = getCurrentMonthRange();
+
+  const [rangeStart, setRangeStart] = useState(initialRange.start);
+  const [rangeEnd, setRangeEnd] = useState(initialRange.end);
+  const [rangeStartInput, setRangeStartInput] = useState(initialRange.start);
+  const [rangeEndInput, setRangeEndInput] = useState(initialRange.end);
   const [dateMap, setDateMap] = useState({});
+  const [deductionRateInput, setDeductionRateInput] = useState('0');
+
+  const loadDataForRange = useCallback(async (startDate, endDate) => {
+    const records = await getRecordsByDateRange(startDate, endDate);
+    setDateMap(groupByDate(records));
+  }, []);
 
   const loadData = useCallback(async () => {
-    const records = await getRecordsByMonth(year, month);
-    setDateMap(groupByDate(records));
-  }, [month, year]);
+    await loadDataForRange(rangeStart, rangeEnd);
+  }, [loadDataForRange, rangeEnd, rangeStart]);
 
   useFocusEffect(
     useCallback(() => {
@@ -68,27 +176,19 @@ export default function SettleScreen() {
     }, [loadData])
   );
 
-  const previousMonth = () => {
-    if (month === 1) {
-      setYear((value) => value - 1);
-      setMonth(12);
-      return;
-    }
-    setMonth((value) => value - 1);
-  };
-
-  const nextMonth = () => {
-    if (month === 12) {
-      setYear((value) => value + 1);
-      setMonth(1);
-      return;
-    }
-    setMonth((value) => value + 1);
-  };
-
   const entries = useMemo(
     () => Object.values(dateMap).sort((left, right) => left.date.localeCompare(right.date)),
     [dateMap]
+  );
+
+  const rangeTitle = useMemo(
+    () => getRangeTitle(rangeStart, rangeEnd),
+    [rangeEnd, rangeStart]
+  );
+
+  const rangeLabel = useMemo(
+    () => `${rangeStart} ~ ${rangeEnd}`,
+    [rangeEnd, rangeStart]
   );
 
   const totals = useMemo(() => {
@@ -105,6 +205,24 @@ export default function SettleScreen() {
       unsettledAmount: totalAmount - settledAmount,
     };
   }, [entries]);
+
+  const deductionRate = useMemo(() => {
+    const parsed = Number(deductionRateInput);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      return 0;
+    }
+
+    return Math.min(parsed, 100);
+  }, [deductionRateInput]);
+
+  const deductionAmounts = useMemo(() => {
+    const deductionAmount = Math.round((totals.totalAmount * deductionRate) / 100);
+
+    return {
+      deductionAmount,
+      netAmount: Math.max(0, totals.totalAmount - deductionAmount),
+    };
+  }, [deductionRate, totals]);
 
   const siteSummaries = useMemo(() => {
     const map = new Map();
@@ -132,6 +250,40 @@ export default function SettleScreen() {
     return [...map.values()].sort((left, right) => right.totalAmount - left.totalAmount);
   }, [entries]);
 
+  const applyRange = async (startDate, endDate) => {
+    if (!isValidDateKey(startDate) || !isValidDateKey(endDate)) {
+      Alert.alert('날짜 형식을 확인해 주세요', '시작일과 종료일은 YYYY-MM-DD 형식으로 입력해 주세요.');
+      return;
+    }
+
+    if (startDate > endDate) {
+      Alert.alert('기간을 확인해 주세요', '종료일은 시작일보다 같거나 늦어야 합니다.');
+      return;
+    }
+
+    setRangeStart(startDate);
+    setRangeEnd(endDate);
+    setRangeStartInput(startDate);
+    setRangeEndInput(endDate);
+    await loadDataForRange(startDate, endDate);
+  };
+
+  const moveRangeByMonth = async (delta) => {
+    const nextRange = shiftMonthRange(rangeStart, delta);
+    await applyRange(nextRange.start, nextRange.end);
+  };
+
+  const resetToCurrentMonth = async () => {
+    const nextRange = getCurrentMonthRange();
+    await applyRange(nextRange.start, nextRange.end);
+  };
+
+  const resetToPreviousMonth = async () => {
+    const currentRange = getCurrentMonthRange();
+    const nextRange = shiftMonthRange(currentRange.start, -1);
+    await applyRange(nextRange.start, nextRange.end);
+  };
+
   const toggleSettled = async (date, currentValue) => {
     await setSettled(date, !currentValue);
     await loadData();
@@ -145,13 +297,13 @@ export default function SettleScreen() {
 
     Alert.alert(
       nextSettled ? '일괄 정산 완료' : '일괄 미정산',
-      `${formatMonthLabel(year, month)} 기록을 ${nextSettled ? '전부 정산 완료' : '전부 미정산'}로 바꿀까요?`,
+      `${rangeLabel} 기록을 ${nextSettled ? '전부 정산 완료' : '전부 미정산'}로 바꿀까요?`,
       [
         { text: '취소', style: 'cancel' },
         {
           text: nextSettled ? '정산 완료' : '미정산으로 변경',
           onPress: async () => {
-            await setSettledByMonth(year, month, nextSettled);
+            await setSettledByDateRange(rangeStart, rangeEnd, nextSettled);
             await loadData();
           },
         },
@@ -210,7 +362,8 @@ export default function SettleScreen() {
           </style>
         </head>
         <body>
-          <h1>${escapeHtml(formatMonthLabel(year, month))} 정산 요약</h1>
+          <h1>${escapeHtml(rangeTitle)} 정산 요약</h1>
+          <p>대상 기간 ${escapeHtml(rangeLabel)}</p>
           <p>출력일 ${escapeHtml(today.toLocaleDateString('ko-KR'))}</p>
 
           <div class="summary">
@@ -249,7 +402,7 @@ export default function SettleScreen() {
       if (await Sharing.isAvailableAsync()) {
         await Sharing.shareAsync(uri, {
           mimeType: 'application/pdf',
-          dialogTitle: `${formatMonthLabel(year, month)} 정산 PDF`,
+          dialogTitle: `${rangeTitle} 정산 PDF`,
         });
       } else {
         Alert.alert('PDF가 생성되었습니다', uri);
@@ -265,29 +418,37 @@ export default function SettleScreen() {
 
       <View style={styles.header}>
         <View style={styles.headerTop}>
-          <TouchableOpacity onPress={previousMonth} style={styles.headerButton}>
+          <TouchableOpacity onPress={() => moveRangeByMonth(-1)} style={styles.headerButton}>
             <Text style={styles.headerButtonText}>{'<'}</Text>
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>{formatMonthLabel(year, month)}</Text>
-          <TouchableOpacity onPress={nextMonth} style={styles.headerButton}>
+          <Text style={styles.headerTitle}>{rangeTitle}</Text>
+          <TouchableOpacity onPress={() => moveRangeByMonth(1)} style={styles.headerButton}>
             <Text style={styles.headerButtonText}>{'>'}</Text>
           </TouchableOpacity>
         </View>
 
         <Text style={styles.amountHeadline}>{formatMoney(totals.totalAmount)}</Text>
-        <Text style={styles.amountSubline}>{formatGongsu(totals.totalGongsu)} 공수 누적</Text>
+        <Text style={styles.amountSubline}>
+          {formatGongsu(totals.totalGongsu)} 공수 · {rangeLabel}
+        </Text>
 
         <View style={styles.pillRow}>
-          <View style={[styles.pill, { backgroundColor: COLORS.settledBg }]}>
+          <TouchableOpacity
+            style={[styles.pill, styles.pillTouchable, { backgroundColor: COLORS.settledBg }]}
+            onPress={() => handleBulkUpdate(true)}
+          >
             <Text style={[styles.pillText, { color: COLORS.settled }]}>
               정산 완료 {formatMoney(totals.settledAmount)}
             </Text>
-          </View>
-          <View style={[styles.pill, { backgroundColor: COLORS.unsettledBg }]}>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.pill, styles.pillTouchable, { backgroundColor: COLORS.unsettledBg }]}
+            onPress={() => handleBulkUpdate(false)}
+          >
             <Text style={[styles.pillText, { color: COLORS.unsettled }]}>
               미정산 {formatMoney(totals.unsettledAmount)}
             </Text>
-          </View>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -296,6 +457,148 @@ export default function SettleScreen() {
         contentContainerStyle={styles.bodyContent}
         showsVerticalScrollIndicator={false}
       >
+        <View style={styles.deductionCard}>
+          <Text style={styles.deductionTitle}>세금/공제 계산</Text>
+
+          <View style={styles.deductionPresetRow}>
+            {DEDUCTION_PRESETS.map((preset) => {
+              const active = Math.abs(deductionRate - preset.rate) < 0.001;
+
+              return (
+                <TouchableOpacity
+                  key={preset.key}
+                  style={[
+                    styles.deductionPresetButton,
+                    active && styles.deductionPresetButtonActive,
+                  ]}
+                  onPress={() => setDeductionRateInput(String(preset.rate))}
+                >
+                  <Text
+                    style={[
+                      styles.deductionPresetButtonText,
+                      active && styles.deductionPresetButtonTextActive,
+                    ]}
+                  >
+                    {preset.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          <View style={styles.deductionInputRow}>
+            <Text style={styles.deductionInputLabel}>공제율(%)</Text>
+            <TextInput
+              style={styles.deductionInput}
+              value={deductionRateInput}
+              onChangeText={(value) => setDeductionRateInput(formatPercentInput(value))}
+              keyboardType="decimal-pad"
+              placeholder="0"
+              placeholderTextColor={COLORS.textSoft}
+            />
+          </View>
+
+          <View style={styles.deductionSummaryRow}>
+            <View style={styles.deductionSummaryCard}>
+              <Text style={styles.deductionSummaryLabel}>총액</Text>
+              <Text style={styles.deductionSummaryValue}>{formatMoney(totals.totalAmount)}</Text>
+            </View>
+            <View style={styles.deductionSummaryCard}>
+              <Text style={styles.deductionSummaryLabel}>공제액</Text>
+              <Text style={styles.deductionSummaryValue}>
+                {formatMoney(deductionAmounts.deductionAmount)}
+              </Text>
+            </View>
+            <View style={styles.deductionSummaryCard}>
+              <Text style={styles.deductionSummaryLabel}>실수령액</Text>
+              <Text style={styles.deductionSummaryValueStrong}>
+                {formatMoney(deductionAmounts.netAmount)}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.deductionSummaryRowAlt}>
+            <View style={[styles.deductionSummaryCard, styles.deductionSummaryCardWide]}>
+              <View style={styles.deductionMetricRow}>
+                <Text style={styles.deductionSummaryLabel}>{'\uCD1D\uC561'}</Text>
+                <Text style={styles.deductionSummaryValue}>{formatMoney(totals.totalAmount)}</Text>
+              </View>
+              <View style={styles.deductionMetricDivider} />
+              <View style={styles.deductionMetricRow}>
+                <Text style={styles.deductionSummaryLabel}>{'\uACF5\uC81C\uC561'}</Text>
+                <Text style={styles.deductionSummaryValue}>
+                  {formatMoney(deductionAmounts.deductionAmount)}
+                </Text>
+              </View>
+            </View>
+            <View style={[styles.deductionSummaryCard, styles.deductionSummaryCardNet]}>
+              <Text style={styles.deductionSummaryLabel}>{'\uC2E4\uC218\uB839\uC561'}</Text>
+              <Text style={styles.deductionSummaryValueStrong}>
+                {formatMoney(deductionAmounts.netAmount)}
+              </Text>
+            </View>
+          </View>
+
+          <Text style={styles.deductionHint}>
+            계산용 예상값입니다. 실제 공제율은 계약 형태와 신고 방식에 따라 달라질 수 있습니다.
+          </Text>
+        </View>
+
+        <View style={styles.rangeCard}>
+          <View style={styles.rangeHeaderRow}>
+            <Text style={styles.rangeTitle}>기간 지정</Text>
+            <View style={styles.rangePresetRow}>
+              <TouchableOpacity style={styles.rangePresetButton} onPress={resetToPreviousMonth}>
+                <Text style={styles.rangePresetButtonText}>지난달</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.rangePresetButton} onPress={resetToCurrentMonth}>
+                <Text style={styles.rangePresetButtonText}>이번 달</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={styles.rangeInputRow}>
+            <View style={styles.rangeInputGroup}>
+              <Text style={styles.rangeInputLabel}>시작일</Text>
+              <TextInput
+                style={styles.rangeInput}
+                value={rangeStartInput}
+                onChangeText={(value) => setRangeStartInput(formatDateInput(value))}
+                keyboardType="number-pad"
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={COLORS.textSoft}
+                autoCapitalize="none"
+                autoCorrect={false}
+                maxLength={10}
+              />
+            </View>
+
+            <Text style={styles.rangeDivider}>~</Text>
+
+            <View style={styles.rangeInputGroup}>
+              <Text style={styles.rangeInputLabel}>종료일</Text>
+              <TextInput
+                style={styles.rangeInput}
+                value={rangeEndInput}
+                onChangeText={(value) => setRangeEndInput(formatDateInput(value))}
+                keyboardType="number-pad"
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={COLORS.textSoft}
+                autoCapitalize="none"
+                autoCorrect={false}
+                maxLength={10}
+              />
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={styles.rangeApplyButton}
+            onPress={() => applyRange(rangeStartInput, rangeEndInput)}
+          >
+            <Text style={styles.rangeApplyButtonText}>기간 적용</Text>
+          </TouchableOpacity>
+        </View>
+
         <View style={styles.bulkActionRow}>
           <TouchableOpacity
             style={[styles.bulkActionButton, styles.bulkActionPrimary]}
@@ -334,14 +637,19 @@ export default function SettleScreen() {
 
           {entries.length === 0 ? (
             <View style={styles.emptyCard}>
-              <Text style={styles.emptyTitle}>이번 달 기록이 아직 없습니다.</Text>
+              <Text style={styles.emptyTitle}>선택한 기간의 기록이 없습니다.</Text>
               <Text style={styles.emptyCopy}>
-                기록 탭에서 입력하면 여기에서 날짜별 정산 상태를 바로 바꿀 수 있습니다.
+                날짜 범위를 조정하거나 기록 탭에서 입력한 뒤 다시 확인해 주세요.
               </Text>
             </View>
           ) : (
             entries.map((entry) => (
-              <View key={entry.date} style={styles.entryCard}>
+              <TouchableOpacity
+                key={entry.date}
+                style={styles.entryCard}
+                activeOpacity={0.82}
+                onPress={() => toggleSettled(entry.date, entry.isSettled)}
+              >
                 <View style={styles.entryInfo}>
                   <View style={styles.entryHeaderRow}>
                     <Text style={styles.entryDate}>{entry.date}</Text>
@@ -379,36 +687,20 @@ export default function SettleScreen() {
                       메모: {entry.memo}
                     </Text>
                   ) : null}
+
+                  <Text style={styles.entryHint}>
+                    {entry.isSettled ? '\uB20C\uB7EC\uC11C \uBBF8\uC815\uC0B0\uC73C\uB85C \uBCC0\uACBD' : '\uB20C\uB7EC\uC11C \uC815\uC0B0\uC644\uB8CC\uB85C \uBCC0\uACBD'}
+                  </Text>
                 </View>
 
-                <TouchableOpacity
-                  style={[
-                    styles.entryActionButton,
-                    entry.isSettled
-                      ? styles.entryActionButtonSecondary
-                      : styles.entryActionButtonPrimary,
-                  ]}
-                  onPress={() => toggleSettled(entry.date, entry.isSettled)}
-                >
-                  <Text
-                    style={[
-                      styles.entryActionButtonText,
-                      entry.isSettled
-                        ? styles.entryActionButtonSecondaryText
-                        : styles.entryActionButtonPrimaryText,
-                    ]}
-                  >
-                    {entry.isSettled ? '완료 취소' : '정산 완료'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
+              </TouchableOpacity>
             ))
           )}
         </View>
 
         {entries.length > 0 ? (
           <TouchableOpacity style={styles.exportButton} onPress={exportPdf}>
-            <Text style={styles.exportButtonText}>월별 정산 PDF 내보내기</Text>
+            <Text style={styles.exportButtonText}>선택 기간 정산 PDF 내보내기</Text>
           </TouchableOpacity>
         ) : null}
       </ScrollView>
@@ -448,9 +740,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   headerTitle: {
+    flex: 1,
     color: '#FFFFFF',
     fontSize: 19,
     fontWeight: '800',
+    textAlign: 'center',
   },
   amountHeadline: {
     color: '#FFFFFF',
@@ -475,6 +769,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
+  pillTouchable: {
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+  },
   pillText: {
     fontSize: 12,
     fontWeight: '800',
@@ -486,6 +784,196 @@ const styles = StyleSheet.create({
   bodyContent: {
     padding: 16,
     gap: 16,
+  },
+  deductionCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    padding: 16,
+    gap: 12,
+  },
+  deductionTitle: {
+    color: COLORS.text,
+    fontSize: 17,
+    fontWeight: '800',
+  },
+  deductionPresetRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  deductionPresetButton: {
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    backgroundColor: COLORS.surfaceMuted,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  deductionPresetButtonActive: {
+    backgroundColor: '#EAF3E2',
+    borderColor: '#B7D8A0',
+  },
+  deductionPresetButtonText: {
+    color: COLORS.text,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  deductionPresetButtonTextActive: {
+    color: '#2F6E2A',
+  },
+  deductionInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  deductionInputLabel: {
+    color: COLORS.textMuted,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  deductionInput: {
+    minWidth: 92,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 14,
+    backgroundColor: COLORS.surfaceMuted,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: COLORS.text,
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  deductionSummaryRow: {
+    display: 'none',
+  },
+  deductionSummaryRowAlt: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  deductionSummaryCard: {
+    flex: 1,
+    borderRadius: 16,
+    backgroundColor: '#F4F7FB',
+    paddingHorizontal: 12,
+    paddingVertical: 14,
+    gap: 6,
+  },
+  deductionSummaryCardWide: {
+    flex: 1.3,
+    gap: 10,
+  },
+  deductionSummaryCardNet: {
+    justifyContent: 'center',
+  },
+  deductionMetricRow: {
+    gap: 6,
+  },
+  deductionMetricDivider: {
+    height: 1,
+    backgroundColor: COLORS.border,
+  },
+  deductionSummaryLabel: {
+    color: COLORS.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  deductionSummaryValue: {
+    color: COLORS.text,
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  deductionSummaryValueStrong: {
+    color: COLORS.primary,
+    fontSize: 15,
+    fontWeight: '900',
+  },
+  deductionHint: {
+    color: COLORS.textMuted,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  rangeCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    padding: 16,
+    gap: 12,
+  },
+  rangeHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  rangePresetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  rangeTitle: {
+    color: COLORS.text,
+    fontSize: 17,
+    fontWeight: '800',
+  },
+  rangePresetButton: {
+    backgroundColor: COLORS.surfaceMuted,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  rangePresetButtonText: {
+    color: COLORS.text,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  rangeInputRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 8,
+  },
+  rangeInputGroup: {
+    flex: 1,
+    gap: 6,
+  },
+  rangeInputLabel: {
+    color: COLORS.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  rangeInput: {
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 14,
+    backgroundColor: COLORS.surfaceMuted,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    color: COLORS.text,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  rangeDivider: {
+    color: COLORS.textMuted,
+    fontSize: 18,
+    fontWeight: '800',
+    paddingBottom: 12,
+  },
+  rangeApplyButton: {
+    backgroundColor: COLORS.primary,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+  },
+  rangeApplyButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
   },
   bulkActionRow: {
     flexDirection: 'row',
@@ -612,6 +1100,12 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     fontSize: 12,
   },
+  entryHint: {
+    color: COLORS.primary,
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 6,
+  },
   entryStatusChip: {
     borderRadius: 999,
     paddingHorizontal: 10,
@@ -626,31 +1120,6 @@ const styles = StyleSheet.create({
   entryStatusChipText: {
     fontSize: 11,
     fontWeight: '800',
-  },
-  entryActionButton: {
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 13,
-    borderWidth: 1,
-  },
-  entryActionButtonPrimary: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
-  },
-  entryActionButtonSecondary: {
-    backgroundColor: COLORS.surface,
-    borderColor: COLORS.border,
-  },
-  entryActionButtonText: {
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  entryActionButtonPrimaryText: {
-    color: '#FFFFFF',
-  },
-  entryActionButtonSecondaryText: {
-    color: COLORS.text,
   },
   exportButton: {
     backgroundColor: COLORS.primary,

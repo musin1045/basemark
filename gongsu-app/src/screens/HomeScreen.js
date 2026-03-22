@@ -446,13 +446,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.12)',
     borderRadius: 18,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 9,
     flexDirection: 'row',
     alignItems: 'center',
   },
   headerStat: {
     flex: 1,
-    gap: 4,
+    gap: 2,
   },
   headerStatLabel: {
     color: 'rgba(255,255,255,0.7)',
@@ -461,12 +461,12 @@ const styles = StyleSheet.create({
   },
   headerStatValue: {
     color: '#FFFFFF',
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '800',
   },
   headerStatDivider: {
     width: 1,
-    height: 36,
+    height: 30,
     backgroundColor: 'rgba(255,255,255,0.18)',
     marginHorizontal: 14,
   },
@@ -532,14 +532,14 @@ const styles = StyleSheet.create({
   },
   daySlot: {
     flex: 1,
-    minHeight: 108,
+    minHeight: 100,
     borderRightWidth: CALENDAR_LINE_WIDTH,
     borderRightColor: CALENDAR_LINE_COLOR,
     backgroundColor: '#FFFFFF',
   },
   emptyCell: {
     flex: 1,
-    minHeight: 108,
+    minHeight: 100,
     borderRightWidth: CALENDAR_LINE_WIDTH,
     borderRightColor: CALENDAR_LINE_COLOR,
     backgroundColor: '#FCFDFE',
@@ -549,9 +549,9 @@ const styles = StyleSheet.create({
   },
   dayInner: {
     flex: 1,
-    paddingHorizontal: 5,
-    paddingTop: 6,
-    paddingBottom: 6,
+    paddingHorizontal: 4,
+    paddingTop: 4,
+    paddingBottom: 4,
   },
   todayRing: {
     position: 'absolute',

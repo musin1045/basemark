@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -8,7 +8,6 @@ import {
   ScrollView,
   StatusBar,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -16,7 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { getRecordsByDate, getSites, saveRecords } from '../db/db';
+import { deleteRecordsByDate, getRecordsByDate, getSites, saveRecords } from '../db/db';
 import {
   formatDateLabel,
   formatGongsu,
@@ -103,6 +102,7 @@ export default function InputScreen({ navigation, route }) {
   const [isHoliday, setIsHoliday] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [hasSavedRecords, setHasSavedRecords] = useState(false);
   const [pickerTarget, setPickerTarget] = useState(null);
   const [primaryGongsuInput, setPrimaryGongsuInput] = useState('');
   const [primaryUnitPriceInput, setPrimaryUnitPriceInput] = useState('');
@@ -117,6 +117,7 @@ export default function InputScreen({ navigation, route }) {
     const records = await getRecordsByDate(targetDate);
 
     if (records.length > 0) {
+      setHasSavedRecords(true);
       setItems(
         records.map((record) => ({
           key: String(record.id),
@@ -139,6 +140,7 @@ export default function InputScreen({ navigation, route }) {
         ? Number(prefillGongsu)
         : 1;
 
+    setHasSavedRecords(false);
     setItems([createDraftItem(availableSites, initialGongsu)]);
     setMemo('');
     setIsSettled(false);
@@ -318,6 +320,49 @@ export default function InputScreen({ navigation, route }) {
     }
   };
 
+  const exitInput = () => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      navigation.navigate('Main');
+    }
+  };
+
+  const handleClose = () => {
+    Alert.alert('닫기', '저장하지 않은 변경사항은 반영되지 않습니다. 나갈까요?', [
+      { text: '계속 입력', style: 'cancel' },
+      {
+        text: '닫기',
+        onPress: exitInput,
+      },
+    ]);
+  };
+
+  const handleDelete = () => {
+    if (!hasSavedRecords) {
+      return;
+    }
+
+    Alert.alert('삭제', '이 날짜에 저장된 입력을 삭제할까요?', [
+      { text: '취소', style: 'cancel' },
+      {
+        text: '삭제',
+        style: 'destructive',
+        onPress: async () => {
+          setSaving(true);
+          try {
+            await deleteRecordsByDate(date);
+            exitInput();
+          } catch (error) {
+            Alert.alert('삭제에 실패했습니다', error.message);
+          } finally {
+            setSaving(false);
+          }
+        },
+      },
+    ]);
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.loadingSafe}>
@@ -333,7 +378,7 @@ export default function InputScreen({ navigation, route }) {
 
       <View style={styles.header}>
         <View style={styles.headerRow}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerIconButton}>
+          <TouchableOpacity onPress={handleClose} style={styles.headerIconButton}>
             <Text style={styles.headerIconText}>닫기</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>일일 입력</Text>
@@ -406,6 +451,43 @@ export default function InputScreen({ navigation, route }) {
               onBlur={commitPrimaryUnitPriceInput}
             />
           </View>
+
+          <View style={styles.settleQuickRow}>
+            <TouchableOpacity
+              style={[
+                styles.settleQuickButton,
+                isSettled ? styles.settleQuickButtonActive : styles.settleQuickButtonIdle,
+              ]}
+              onPress={() => setIsSettled(true)}
+            >
+              <Text
+                style={[
+                  styles.settleQuickButtonText,
+                  isSettled ? styles.settleQuickButtonActiveText : styles.settleQuickButtonIdleText,
+                ]}
+              >
+                정산완료
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.settleQuickButton,
+                !isSettled ? styles.settleQuickButtonActive : styles.settleQuickButtonIdle,
+              ]}
+              onPress={() => setIsSettled(false)}
+            >
+              <Text
+                style={[
+                  styles.settleQuickButtonText,
+                  !isSettled ? styles.settleQuickButtonActiveText : styles.settleQuickButtonIdleText,
+                ]}
+              >
+                미정산
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.topQuickHint}>여기서 바꾼 단가는 오늘 입력에만 적용됩니다.</Text>
         </View>
       </View>
 
@@ -423,7 +505,24 @@ export default function InputScreen({ navigation, route }) {
         >
           <View style={styles.summaryCard}>
             <View>
-              <Text style={styles.summaryLabel}>총 합계</Text>
+              <View style={styles.summaryLabelRow}>
+                <Text style={styles.summaryLabel}>총 합계</Text>
+                <View
+                  style={[
+                    styles.summaryStatusChip,
+                    isSettled ? styles.summaryStatusChipSettled : styles.summaryStatusChipUnsettled,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.summaryStatusText,
+                      isSettled ? styles.summaryStatusTextSettled : styles.summaryStatusTextUnsettled,
+                    ]}
+                  >
+                    {isSettled ? '정산완료' : '미정산'}
+                  </Text>
+                </View>
+              </View>
               <Text style={styles.summaryValue}>{formatMoney(totalAmount)}</Text>
             </View>
             <View>
@@ -537,19 +636,6 @@ export default function InputScreen({ navigation, route }) {
           </TouchableOpacity>
 
           <View style={styles.optionsCard}>
-            <View style={styles.optionRow}>
-              <View>
-                <Text style={styles.optionLabel}>정산 완료</Text>
-                <Text style={styles.optionHint}>정산 탭에서 완료 항목으로 집계됩니다.</Text>
-              </View>
-              <Switch
-                value={isSettled}
-                onValueChange={setIsSettled}
-                trackColor={{ false: '#D6DFEA', true: '#BFD7A4' }}
-                thumbColor={isSettled ? COLORS.settled : '#FFFFFF'}
-              />
-            </View>
-
             <View style={styles.memoGroup}>
               <Text style={styles.fieldLabel}>메모</Text>
               <TextInput
@@ -572,13 +658,28 @@ export default function InputScreen({ navigation, route }) {
           { paddingBottom: Math.max(insets.bottom, 10) + 12 },
         ]}
       >
-        <TouchableOpacity
-          style={[styles.saveButton, saving && styles.saveButtonDisabled]}
-          onPress={handleSave}
-          disabled={saving}
-        >
-          <Text style={styles.saveButtonText}>{saving ? '저장 중...' : '저장하기'}</Text>
-        </TouchableOpacity>
+        <View style={styles.footerRow}>
+          {hasSavedRecords ? (
+            <TouchableOpacity
+              style={[styles.deleteButton, saving && styles.saveButtonDisabled]}
+              onPress={handleDelete}
+              disabled={saving}
+            >
+              <Text style={styles.deleteButtonText}>삭제</Text>
+            </TouchableOpacity>
+          ) : null}
+          <TouchableOpacity
+            style={[
+              styles.saveButton,
+              hasSavedRecords ? styles.saveButtonSplit : styles.saveButtonFull,
+              saving && styles.saveButtonDisabled,
+            ]}
+            onPress={handleSave}
+            disabled={saving}
+          >
+            <Text style={styles.saveButtonText}>{saving ? '저장 중...' : '저장하기'}</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <Modal visible={pickerTarget !== null} transparent animationType="slide">
@@ -729,6 +830,39 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
   },
+  settleQuickRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  settleQuickButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  settleQuickButtonIdle: {
+    backgroundColor: COLORS.surfaceMuted,
+    borderColor: COLORS.border,
+  },
+  settleQuickButtonActive: {
+    backgroundColor: COLORS.settledBg,
+    borderColor: '#B7D8A0',
+  },
+  settleQuickButtonText: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  settleQuickButtonIdleText: {
+    color: COLORS.textMuted,
+  },
+  settleQuickButtonActiveText: {
+    color: COLORS.settled,
+  },
+  topQuickHint: {
+    color: COLORS.textMuted,
+    fontSize: 12,
+    fontWeight: '600',
+  },
   topQuickInput: {
     borderWidth: 1,
     borderColor: COLORS.border,
@@ -765,6 +899,32 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.72)',
     fontSize: 12,
     fontWeight: '600',
+  },
+  summaryLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  summaryStatusChip: {
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  summaryStatusChipSettled: {
+    backgroundColor: 'rgba(202, 239, 183, 0.22)',
+  },
+  summaryStatusChipUnsettled: {
+    backgroundColor: 'rgba(255, 226, 194, 0.2)',
+  },
+  summaryStatusText: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  summaryStatusTextSettled: {
+    color: '#D7F0C7',
+  },
+  summaryStatusTextUnsettled: {
+    color: '#FFE4BF',
   },
   summaryValue: {
     color: '#FFFFFF',
@@ -891,22 +1051,6 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 16,
   },
-  optionRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 12,
-  },
-  optionLabel: {
-    color: COLORS.text,
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  optionHint: {
-    color: COLORS.textMuted,
-    fontSize: 12,
-    marginTop: 4,
-  },
   memoGroup: {
     gap: 8,
   },
@@ -933,12 +1077,37 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
   },
+  footerRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  deleteButton: {
+    flex: 1,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    backgroundColor: '#FFF4F2',
+    borderWidth: 1,
+    borderColor: '#F0B6AD',
+  },
+  deleteButtonText: {
+    color: COLORS.danger,
+    fontSize: 16,
+    fontWeight: '800',
+  },
   saveButton: {
     backgroundColor: COLORS.primary,
     borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 16,
+  },
+  saveButtonSplit: {
+    flex: 1.15,
+  },
+  saveButtonFull: {
+    flex: 1,
   },
   saveButtonDisabled: {
     opacity: 0.7,

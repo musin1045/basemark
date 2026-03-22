@@ -29,38 +29,56 @@ const NAVIGATION_THEME = {
 
 function HomeTabs() {
   const insets = useSafeAreaInsets();
-  const bottomInset = Math.max(insets.bottom, 10);
+  const safeBottomInset = Math.max(insets.bottom, 0);
+  const tabBarBottomPadding = 0;
+  const tabBarTopPadding = 2;
+  const tabBarHeight = 54 + safeBottomInset;
+  const tabTitles = {
+    HomeTab: '\uAE30\uB85D',
+    SitesTab: '\uD604\uC7A5',
+    SettleTab: '\uC815\uC0B0',
+    SettingsTab: '\uC124\uC815',
+  };
 
   return (
     <Tab.Navigator
-      screenOptions={{
+      screenOptions={({ route }) => ({
         headerShown: false,
         tabBarShowIcon: false,
+        tabBarIcon: () => null,
         tabBarActiveTintColor: COLORS.primary,
         tabBarInactiveTintColor: COLORS.textMuted,
         tabBarStyle: {
           backgroundColor: COLORS.surface,
           borderTopColor: COLORS.border,
-          height: 62 + bottomInset,
-          paddingBottom: bottomInset,
-          paddingTop: 8,
+          height: tabBarHeight,
+          paddingBottom: tabBarBottomPadding,
+          paddingTop: tabBarTopPadding,
         },
         tabBarItemStyle: {
-          paddingVertical: 6,
+          paddingTop: 2,
+          paddingBottom: safeBottomInset > 0 ? safeBottomInset + 6 : 12,
+          justifyContent: 'flex-start',
         },
         tabBarLabelStyle: {
-          fontSize: 12,
+          fontSize: 15,
           fontWeight: '700',
+          lineHeight: 18,
+          includeFontPadding: false,
+          marginTop: -10,
+          marginBottom: 0,
+          paddingBottom: 0,
         },
-      }}
+        tabBarLabel: tabTitles[route.name] ?? route.name,
+      })}
     >
-      <Tab.Screen name="HomeTab" component={HomeScreen} options={{ title: '기록' }} />
-      <Tab.Screen name="SitesTab" component={SiteScreen} options={{ title: '현장' }} />
-      <Tab.Screen name="SettleTab" component={SettleScreen} options={{ title: '정산' }} />
+      <Tab.Screen name="HomeTab" component={HomeScreen} options={{ title: '\uAE30\uB85D' }} />
+      <Tab.Screen name="SitesTab" component={SiteScreen} options={{ title: '\uD604\uC7A5' }} />
+      <Tab.Screen name="SettleTab" component={SettleScreen} options={{ title: '\uC815\uC0B0' }} />
       <Tab.Screen
         name="SettingsTab"
         component={SettingsScreen}
-        options={{ title: '설정' }}
+        options={{ title: '\uC124\uC815' }}
       />
     </Tab.Navigator>
   );
