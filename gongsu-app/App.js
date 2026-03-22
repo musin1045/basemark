@@ -3,11 +3,11 @@ import 'react-native-gesture-handler';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { Text } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import HomeScreen from './src/screens/HomeScreen';
 import InputScreen from './src/screens/InputScreen';
+import SettingsScreen from './src/screens/SettingsScreen';
 import SettleScreen from './src/screens/SettleScreen';
 import SiteScreen from './src/screens/SiteScreen';
 import { COLORS } from './src/lib/theme';
@@ -27,20 +27,15 @@ const NAVIGATION_THEME = {
   },
 };
 
-const TAB_ICONS = {
-  HomeTab: '기록',
-  SitesTab: '현장',
-  SettleTab: '정산',
-};
-
 function HomeTabs() {
   const insets = useSafeAreaInsets();
   const bottomInset = Math.max(insets.bottom, 10);
 
   return (
     <Tab.Navigator
-      screenOptions={({ route }) => ({
+      screenOptions={{
         headerShown: false,
+        tabBarShowIcon: false,
         tabBarActiveTintColor: COLORS.primary,
         tabBarInactiveTintColor: COLORS.textMuted,
         tabBarStyle: {
@@ -54,30 +49,18 @@ function HomeTabs() {
           paddingVertical: 6,
         },
         tabBarLabelStyle: {
-          fontSize: 13,
+          fontSize: 12,
           fontWeight: '700',
         },
-        tabBarIcon: ({ color }) => (
-          <Text style={{ color, fontSize: 12, fontWeight: '700' }}>
-            {TAB_ICONS[route.name]}
-          </Text>
-        ),
-      })}
+      }}
     >
+      <Tab.Screen name="HomeTab" component={HomeScreen} options={{ title: '기록' }} />
+      <Tab.Screen name="SitesTab" component={SiteScreen} options={{ title: '현장' }} />
+      <Tab.Screen name="SettleTab" component={SettleScreen} options={{ title: '정산' }} />
       <Tab.Screen
-        name="HomeTab"
-        component={HomeScreen}
-        options={{ title: '기록' }}
-      />
-      <Tab.Screen
-        name="SitesTab"
-        component={SiteScreen}
-        options={{ title: '현장' }}
-      />
-      <Tab.Screen
-        name="SettleTab"
-        component={SettleScreen}
-        options={{ title: '정산' }}
+        name="SettingsTab"
+        component={SettingsScreen}
+        options={{ title: '설정' }}
       />
     </Tab.Navigator>
   );
