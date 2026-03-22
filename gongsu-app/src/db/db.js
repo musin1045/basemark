@@ -8,6 +8,154 @@ const DEFAULT_SITE = {
 
 let databasePromise;
 
+function toNumber(value, fallback = 0) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function toBooleanFlag(value) {
+  if (typeof value === 'boolean') {
+    return value ? 1 : 0;
+  }
+
+  if (typeof value === 'string') {
+    const normalized = value.trim().toLowerCase();
+    if (['1', 'true', 'yes', 'y', 'done', 'settled', 'holiday'].includes(normalized)) {
+      return 1;
+    }
+    if (['0', 'false', 'no', 'n', 'pending', 'unsettled'].includes(normalized)) {
+      return 0;
+    }
+  }
+
+  return Number(value) === 1 ? 1 : 0;
+}
+
+function pickFirst(source, keys) {
+  if (!source || typeof source !== 'object') {
+    return undefined;
+  }
+
+  for (const key of keys) {
+    if (source[key] !== undefined && source[key] !== null) {
+      return source[key];
+    }
+  }
+
+  return undefined;
+}
+
+function normalizeSiteBackup(site, index) {
+  const id = pickFirst(site, ['id', 'siteId', 'site_id']);
+  const name = String(pickFirst(site, ['name', 'siteName', 'site_name']) ?? '').trim();
+  const unitPrice = toNumber(pickFirst(site, ['unitPrice', 'unit_price', 'price', 'dailyRate']), 0);
+  const color = String(pickFirst(site, ['color', 'siteColor', 'site_color']) ?? DEFAULT_SITE.color);
+  const createdAt = String(
+    pickFirst(site, ['createdAt', 'created_at']) ?? new Date(Date.now() + index).toISOString()
+  );
+
+  if (!name) {
+    return null;
+  }
+
+  return {
+    id: Number.isInteger(Number(id)) ? Number(id) : null,
+    name,
+    unitPrice,
+    color,
+    createdAt,
+  };
+}
+
+function normalizeRecordBackup(record, index) {
+  const date = String(pickFirst(record, ['date', 'day', 'workDate', 'recordDate']) ?? '').trim();
+  if (!date) {
+    return null;
+  }
+
+  const siteId = pickFirst(record, ['siteId', 'site_id']);
+  const siteName = String(pickFirst(record, ['siteName', 'site_name', 'site']) ?? '').trim();
+  const siteColor = String(
+    pickFirst(record, ['siteColor', 'site_color', 'color']) ?? DEFAULT_SITE.color
+  );
+  const taskName = String(
+    pickFirst(record, ['taskName', 'task_name', 'task', 'title', 'work', 'content']) ?? ''
+  ).trim();
+  const gongsu = toNumber(
+    pickFirst(record, ['gongsu', 'gongsoo', 'gongSu', 'workload', 'qty']),
+    0
+  );
+  const unitPrice = toNumber(
+    pickFirst(record, ['unitPrice', 'unit_price', 'price', 'dailyRate']),
+    0
+  );
+  const amountValue = pickFirst(record, ['amount', 'income', 'totalAmount']);
+  const amount = Math.round(
+    amountValue === undefined ? gongsu * unitPrice : toNumber(amountValue, gongsu * unitPrice)
+  );
+  const memo = String(pickFirst(record, ['memo', 'note', 'notes', 'comment']) ?? '').trim();
+  const isSettled = toBooleanFlag(
+    pickFirst(record, ['isSettled', 'is_settled', 'settled', 'done'])
+  );
+  const isHoliday = toBooleanFlag(
+    pickFirst(record, ['isHoliday', 'is_holiday', 'holiday', 'dayOff'])
+  );
+  const createdAt = String(
+    pickFirst(record, ['createdAt', 'created_at']) ?? new Date(Date.now() + index).toISOString()
+  );
+
+  return {
+    id: Number.isInteger(Number(record.id)) ? Number(record.id) : null,
+    date,
+    siteId: Number.isInteger(Number(siteId)) ? Number(siteId) : null,
+    siteName,
+    siteColor,
+    taskName,
+    gongsu,
+    unitPrice,
+    amount,
+    memo,
+    isSettled,
+    isHoliday,
+    createdAt,
+  };
+}
+
+function extractBackupArrays(payload) {
+  if (Array.isArray(payload)) {
+    return {
+      sites: [],
+      records: payload,
+    };
+  }
+
+  if (!payload || typeof payload !== 'object') {
+    return {
+      sites: [],
+      records: [],
+    };
+  }
+
+  const containers = [payload, payload.data, payload.backup, payload.payload].filter(Boolean);
+
+  for (const container of containers) {
+    const sites = pickFirst(container, ['sites', 'siteList', 'worksites', 'jobSites']);
+    const records = pickFirst(container, ['records', 'recordList', 'entries', 'items', 'works']);
+
+    if (Array.isArray(sites) || Array.isArray(records)) {
+      return {
+        sites: Array.isArray(sites) ? sites : [],
+        records: Array.isArray(records) ? records : [],
+      };
+    }
+  }
+
+  return {
+    sites: [],
+    records: [],
+  };
+}
+
 async function ensureColumn(database, table, column, definition) {
   const columns = await database.getAllAsync(`PRAGMA table_info(${table})`);
   if (!columns.some((item) => item.name === column)) {
@@ -263,6 +411,172 @@ export async function setSettledByMonth(year, month, isSettled) {
     'UPDATE records SET is_settled = ? WHERE date LIKE ?',
     [isSettled ? 1 : 0, `${prefix}%`]
   );
+}
+
+export async function exportBackupData() {
+  const database = await getDB();
+  const sites = await database.getAllAsync(
+    'SELECT id, name, unit_price, color, created_at FROM sites ORDER BY created_at ASC, id ASC'
+  );
+  const records = await database.getAllAsync(
+    `
+      SELECT
+        id,
+        date,
+        site_id,
+        site_name,
+        site_color,
+        task_name,
+        gongsu,
+        unit_price,
+        amount,
+        memo,
+        is_settled,
+        is_holiday,
+        created_at
+      FROM records
+      ORDER BY date ASC, id ASC
+    `
+  );
+
+  return {
+    app: 'gongsu-app',
+    schemaVersion: 1,
+    exportedAt: new Date().toISOString(),
+    sites,
+    records,
+  };
+}
+
+export async function importBackupData(payload) {
+  const database = await getDB();
+  const extracted = extractBackupArrays(payload);
+  const normalizedSites = extracted.sites
+    .map(normalizeSiteBackup)
+    .filter(Boolean);
+  const normalizedRecords = extracted.records
+    .map(normalizeRecordBackup)
+    .filter(Boolean);
+
+  if (normalizedSites.length === 0 && normalizedRecords.length === 0) {
+    throw new Error('가져올 수 있는 사이트나 기록이 없습니다. JSON 형식을 확인해 주세요.');
+  }
+
+  await database.execAsync('BEGIN TRANSACTION;');
+
+  try {
+    await database.runAsync('DELETE FROM records');
+    await database.runAsync('DELETE FROM sites');
+
+    for (const site of normalizedSites) {
+      if (site.id !== null) {
+        await database.runAsync(
+          `
+            INSERT INTO sites (id, name, unit_price, color, created_at)
+            VALUES (?, ?, ?, ?, ?)
+          `,
+          [site.id, site.name, site.unitPrice, site.color, site.createdAt]
+        );
+      } else {
+        await database.runAsync(
+          `
+            INSERT INTO sites (name, unit_price, color, created_at)
+            VALUES (?, ?, ?, ?)
+          `,
+          [site.name, site.unitPrice, site.color, site.createdAt]
+        );
+      }
+    }
+
+    if (normalizedSites.length === 0) {
+      await database.runAsync(
+        'INSERT INTO sites (name, unit_price, color) VALUES (?, ?, ?)',
+        [DEFAULT_SITE.name, DEFAULT_SITE.unitPrice, DEFAULT_SITE.color]
+      );
+    }
+
+    for (const record of normalizedRecords) {
+      if (record.id !== null) {
+        await database.runAsync(
+          `
+            INSERT INTO records (
+              id,
+              date,
+              site_id,
+              site_name,
+              site_color,
+              task_name,
+              gongsu,
+              unit_price,
+              amount,
+              memo,
+              is_settled,
+              is_holiday,
+              created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `,
+          [
+            record.id,
+            record.date,
+            record.siteId,
+            record.siteName,
+            record.siteColor,
+            record.taskName,
+            record.gongsu,
+            record.unitPrice,
+            record.amount,
+            record.memo,
+            record.isSettled,
+            record.isHoliday,
+            record.createdAt,
+          ]
+        );
+      } else {
+        await database.runAsync(
+          `
+            INSERT INTO records (
+              date,
+              site_id,
+              site_name,
+              site_color,
+              task_name,
+              gongsu,
+              unit_price,
+              amount,
+              memo,
+              is_settled,
+              is_holiday,
+              created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `,
+          [
+            record.date,
+            record.siteId,
+            record.siteName,
+            record.siteColor,
+            record.taskName,
+            record.gongsu,
+            record.unitPrice,
+            record.amount,
+            record.memo,
+            record.isSettled,
+            record.isHoliday,
+            record.createdAt,
+          ]
+        );
+      }
+    }
+
+    await database.execAsync('COMMIT;');
+
+    return {
+      siteCount: normalizedSites.length,
+      recordCount: normalizedRecords.length,
+    };
+  } catch (error) {
+    await database.execAsync('ROLLBACK;');
+    throw error;
+  }
 }
 
 export function groupByDate(records) {
