@@ -2,6 +2,7 @@
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   Platform,
   ScrollView,
   StatusBar,
@@ -16,10 +17,37 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { exportBackupData, importBackupData, previewBackupData } from '../db/db';
+import {
+  exportBackupData,
+  getAppSetting,
+  importBackupData,
+  previewBackupData,
+  setAppSetting,
+} from '../db/db';
+import {
+  DEFAULT_EVENING_REMINDER_SETTINGS,
+  EVENING_REMINDER_SETTING_KEY,
+  formatEveningReminderTime,
+  isNotificationFeatureSupported,
+  normalizeEveningReminderSettings,
+  syncEveningReminderAsync,
+} from '../lib/notifications';
+import {
+  getPrivacyPolicyLink,
+  PRIVACY_POLICY_CONTACT_URL,
+  PRIVACY_POLICY_EFFECTIVE_DATE,
+  PRIVACY_POLICY_SUMMARY,
+} from '../lib/privacyPolicy';
 import { COLORS } from '../lib/theme';
+import { checkForAppUpdate } from '../lib/updateCheck';
 
 const AUTO_BACKUP_PREFIX = 'gongsu-before-import-';
+const EVENING_REMINDER_PRESETS = [
+  { label: '18:00', hour: 18, minute: 0 },
+  { label: '19:00', hour: 19, minute: 0 },
+  { label: '20:00', hour: 20, minute: 0 },
+  { label: '21:00', hour: 21, minute: 0 },
+];
 
 function formatDateStamp(date = new Date()) {
   const year = date.getFullYear();
@@ -70,9 +98,28 @@ async function findLatestAutoBackupFile() {
   };
 }
 
+async function readEveningReminderSettings() {
+  const rawValue = await getAppSetting(EVENING_REMINDER_SETTING_KEY, '');
+
+  if (!rawValue) {
+    return DEFAULT_EVENING_REMINDER_SETTINGS;
+  }
+
+  try {
+    return normalizeEveningReminderSettings(JSON.parse(rawValue));
+  } catch {
+    return DEFAULT_EVENING_REMINDER_SETTINGS;
+  }
+}
+
 export default function SettingsScreen() {
   const [summary, setSummary] = useState({ siteCount: 0, recordCount: 0 });
   const [loadingSummary, setLoadingSummary] = useState(true);
+  const [loadingUpdateInfo, setLoadingUpdateInfo] = useState(true);
+  const [updateInfo, setUpdateInfo] = useState(null);
+  const [loadingReminder, setLoadingReminder] = useState(true);
+  const [savingReminder, setSavingReminder] = useState(false);
+  const [reminderSettings, setReminderSettings] = useState(DEFAULT_EVENING_REMINDER_SETTINGS);
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
@@ -90,10 +137,32 @@ export default function SettingsScreen() {
     }
   }, []);
 
+  const loadReminderSettings = useCallback(async () => {
+    setLoadingReminder(true);
+    try {
+      const nextSettings = await readEveningReminderSettings();
+      setReminderSettings(nextSettings);
+    } finally {
+      setLoadingReminder(false);
+    }
+  }, []);
+
+  const loadUpdateInfo = useCallback(async () => {
+    setLoadingUpdateInfo(true);
+    try {
+      const nextUpdateInfo = await checkForAppUpdate();
+      setUpdateInfo(nextUpdateInfo);
+    } finally {
+      setLoadingUpdateInfo(false);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
-      loadSummary();
-    }, [loadSummary])
+      void loadSummary();
+      void loadUpdateInfo();
+      void loadReminderSettings();
+    }, [loadReminderSettings, loadSummary, loadUpdateInfo])
   );
 
   const createBackupExportFile = useCallback(async () => {
@@ -153,6 +222,120 @@ export default function SettingsScreen() {
     }
 
     return FileSystem.readAsStringAsync(selectedFile.uri);
+  }, []);
+
+  const persistReminderSettings = useCallback(async (nextSettings) => {
+    await setAppSetting(
+      EVENING_REMINDER_SETTING_KEY,
+      JSON.stringify(normalizeEveningReminderSettings(nextSettings))
+    );
+  }, []);
+
+  const handleReminderToggle = useCallback(async () => {
+    if (savingReminder || loadingReminder) {
+      return;
+    }
+
+    if (!isNotificationFeatureSupported()) {
+      Alert.alert('알림 지원 없음', '이 환경에서는 저녁 알림을 사용할 수 없습니다.');
+      return;
+    }
+
+    const requestedSettings = {
+      ...reminderSettings,
+      enabled: !reminderSettings.enabled,
+    };
+
+    setSavingReminder(true);
+    setStatusMessage('');
+
+    try {
+      const result = await syncEveningReminderAsync(requestedSettings, {
+        requestPermissions: requestedSettings.enabled,
+      });
+      const persistedSettings = normalizeEveningReminderSettings(result.settings);
+
+      await persistReminderSettings(persistedSettings);
+      setReminderSettings(persistedSettings);
+
+      if (requestedSettings.enabled && !result.granted) {
+        setStatusMessage('알림 권한이 없어 저녁 알림을 켜지 못했습니다.');
+        Alert.alert(
+          '알림 권한 필요',
+          '기기 설정에서 알림 권한을 허용한 뒤 다시 켜 주세요.'
+        );
+        return;
+      }
+
+      setStatusMessage(
+        persistedSettings.enabled
+          ? `매일 ${formatEveningReminderTime(persistedSettings)} 알림을 켰습니다.`
+          : '저녁 알림을 껐습니다.'
+      );
+    } catch (error) {
+      Alert.alert('저녁 알림 설정 실패', getImportErrorMessage(error));
+    } finally {
+      setSavingReminder(false);
+    }
+  }, [loadingReminder, persistReminderSettings, reminderSettings, savingReminder]);
+
+  const handleReminderPreset = useCallback(
+    async (preset) => {
+      if (savingReminder || loadingReminder) {
+        return;
+      }
+
+      const requestedSettings = normalizeEveningReminderSettings({
+        ...reminderSettings,
+        hour: preset.hour,
+        minute: preset.minute,
+      });
+
+      setSavingReminder(true);
+      setStatusMessage('');
+
+      try {
+        const result = requestedSettings.enabled
+          ? await syncEveningReminderAsync(requestedSettings)
+          : {
+              settings: requestedSettings,
+              granted: true,
+            };
+        const persistedSettings = normalizeEveningReminderSettings(result.settings);
+
+        await persistReminderSettings(persistedSettings);
+        setReminderSettings(persistedSettings);
+        setStatusMessage(
+          persistedSettings.enabled
+            ? `저녁 알림 시간을 ${formatEveningReminderTime(persistedSettings)}로 바꿨습니다.`
+            : `저녁 알림 시간을 ${formatEveningReminderTime(persistedSettings)}로 저장했습니다.`
+        );
+      } catch (error) {
+        Alert.alert('알림 시간 저장 실패', getImportErrorMessage(error));
+      } finally {
+        setSavingReminder(false);
+      }
+    },
+    [loadingReminder, persistReminderSettings, reminderSettings, savingReminder]
+  );
+
+  const handleOpenExternalLink = useCallback(async (url, title) => {
+    const targetUrl = String(url ?? '').trim();
+
+    if (!targetUrl) {
+      return;
+    }
+
+    try {
+      const supported = await Linking.canOpenURL(targetUrl);
+      if (!supported) {
+        throw new Error('링크를 열 수 없습니다.');
+      }
+
+      await Linking.openURL(targetUrl);
+    } catch (error) {
+      Alert.alert(title, error?.message || '링크를 열지 못했습니다.');
+    }
   }, []);
 
   const handleSaveToDevice = async () => {
@@ -395,6 +578,195 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.section}>
+          <Text style={styles.sectionTitle}>앱 업데이트</Text>
+          <Text style={styles.sectionCopy}>
+            최신 버전 여부와 다음 배포 안내를 여기에서 확인합니다.
+          </Text>
+
+          {loadingUpdateInfo ? (
+            <View style={styles.loadingRow}>
+              <ActivityIndicator color={COLORS.primary} />
+              <Text style={styles.loadingText}>업데이트 정보를 확인하는 중입니다.</Text>
+            </View>
+          ) : updateInfo ? (
+            <>
+              <View style={styles.updateCard}>
+                <View style={styles.updateVersionRow}>
+                  <View style={styles.updateVersionBlock}>
+                    <Text style={styles.summaryLabel}>현재 버전</Text>
+                    <Text style={styles.updateVersionValue}>{updateInfo.currentVersion}</Text>
+                  </View>
+                  <View style={styles.summaryDivider} />
+                  <View style={styles.updateVersionBlock}>
+                    <Text style={styles.summaryLabel}>최신 버전</Text>
+                    <Text style={styles.updateVersionValue}>{updateInfo.latestVersion}</Text>
+                  </View>
+                </View>
+
+                <View
+                  style={[
+                    styles.updateStatusChip,
+                    updateInfo.hasUpdate
+                      ? styles.updateStatusChipWarning
+                      : styles.updateStatusChipCurrent,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.updateStatusChipText,
+                      updateInfo.hasUpdate
+                        ? styles.updateStatusChipTextWarning
+                        : styles.updateStatusChipTextCurrent,
+                    ]}
+                  >
+                    {updateInfo.isRequired
+                      ? '업데이트 필요'
+                      : updateInfo.hasUpdate
+                        ? '업데이트 가능'
+                        : '최신 상태'}
+                  </Text>
+                </View>
+
+                <Text style={styles.updateHeadline}>{updateInfo.headline}</Text>
+                <Text style={styles.noteText}>{updateInfo.message}</Text>
+                {updateInfo.fetchErrorMessage ? (
+                  <Text style={styles.noteText}>
+                    네트워크 확인이 되지 않아 번들된 안내를 보여주고 있습니다.
+                  </Text>
+                ) : null}
+                <Text style={styles.noteText}>
+                  채널: {updateInfo.releaseChannel || 'default'}
+                  {updateInfo.publishedAt ? ` · 배포일 ${updateInfo.publishedAt}` : ''}
+                </Text>
+              </View>
+
+              <View style={styles.exportButtonRow}>
+                <TouchableOpacity
+                  style={[styles.secondaryButton, styles.exportButtonHalf]}
+                  onPress={loadUpdateInfo}
+                >
+                  <Text style={styles.secondaryButtonText}>업데이트 다시 확인</Text>
+                </TouchableOpacity>
+                {updateInfo.downloadUrl ? (
+                  <TouchableOpacity
+                    style={[styles.primaryButton, styles.exportButtonHalf]}
+                    onPress={() => handleOpenExternalLink(updateInfo.downloadUrl, '업데이트 링크 열기 실패')}
+                  >
+                    <Text style={styles.primaryButtonText}>안내 열기</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            </>
+          ) : (
+            <Text style={styles.noteText}>업데이트 정보를 아직 읽지 못했습니다.</Text>
+          )}
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>저녁 알림</Text>
+          <Text style={styles.sectionCopy}>
+            매일 저녁 한 번, 오늘 기록 입력을 잊지 않도록 알려줍니다.
+          </Text>
+
+          {loadingReminder ? (
+            <View style={styles.loadingRow}>
+              <ActivityIndicator color={COLORS.primary} />
+              <Text style={styles.loadingText}>알림 설정을 불러오는 중입니다.</Text>
+            </View>
+          ) : (
+            <>
+              <View style={styles.reminderSummaryCard}>
+                <Text style={styles.summaryLabel}>현재 시간</Text>
+                <Text style={styles.reminderTimeValue}>
+                  {formatEveningReminderTime(reminderSettings)}
+                </Text>
+                <View
+                  style={[
+                    styles.reminderStatusChip,
+                    reminderSettings.enabled
+                      ? styles.reminderStatusChipActive
+                      : styles.reminderStatusChipInactive,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.reminderStatusChipText,
+                      reminderSettings.enabled
+                        ? styles.reminderStatusChipTextActive
+                        : styles.reminderStatusChipTextInactive,
+                    ]}
+                  >
+                    {reminderSettings.enabled ? '켜짐' : '꺼짐'}
+                  </Text>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={[
+                  reminderSettings.enabled ? styles.secondaryButton : styles.primaryButton,
+                  savingReminder && styles.buttonDisabled,
+                ]}
+                onPress={handleReminderToggle}
+                disabled={savingReminder}
+              >
+                <Text
+                  style={
+                    reminderSettings.enabled
+                      ? styles.secondaryButtonText
+                      : styles.primaryButtonText
+                  }
+                >
+                  {savingReminder
+                    ? '처리 중...'
+                    : reminderSettings.enabled
+                      ? '저녁 알림 끄기'
+                      : '저녁 알림 켜기'}
+                </Text>
+              </TouchableOpacity>
+
+              <View style={styles.reminderPresetRow}>
+                {EVENING_REMINDER_PRESETS.map((preset) => {
+                  const active =
+                    reminderSettings.hour === preset.hour &&
+                    reminderSettings.minute === preset.minute;
+
+                  return (
+                    <TouchableOpacity
+                      key={preset.label}
+                      style={[
+                        styles.reminderPresetButton,
+                        active && styles.reminderPresetButtonActive,
+                        savingReminder && styles.buttonDisabled,
+                      ]}
+                      onPress={() => handleReminderPreset(preset)}
+                      disabled={savingReminder}
+                    >
+                      <Text
+                        style={[
+                          styles.reminderPresetButtonText,
+                          active && styles.reminderPresetButtonTextActive,
+                        ]}
+                      >
+                        {preset.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <Text style={styles.noteText}>
+                알림을 켜면 매일 {formatEveningReminderTime(reminderSettings)}에 반복 알림을 보냅니다.
+              </Text>
+              {!isNotificationFeatureSupported() ? (
+                <Text style={styles.warningText}>
+                  이 환경에서는 알림 예약 기능을 사용할 수 없습니다.
+                </Text>
+              ) : null}
+            </>
+          )}
+        </View>
+
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>백업 내보내기</Text>
           <Text style={styles.sectionCopy}>
             휴대폰 폴더에 직접 저장하거나, 공유 시트로 PC/이메일/메신저에 바로 보낼 수 있습니다.
@@ -459,6 +831,29 @@ export default function SettingsScreen() {
           <Text style={styles.warningText}>
             가져오기를 실행하면 현재 앱 안의 현장과 기록 데이터는 선택한 파일 내용으로 교체됩니다.
           </Text>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>개인정보처리방침</Text>
+          <Text style={styles.sectionCopy}>
+            스토어 제출과 사용자 안내에 맞춰 앱 안에서 바로 확인할 수 있도록 정리했습니다.
+          </Text>
+          <View style={styles.privacyCard}>
+            <Text style={styles.summaryLabel}>시행일</Text>
+            <Text style={styles.noteText}>{PRIVACY_POLICY_EFFECTIVE_DATE}</Text>
+            {PRIVACY_POLICY_SUMMARY.map((line) => (
+              <Text key={line} style={styles.noteText}>
+                {line}
+              </Text>
+            ))}
+            <Text style={styles.noteText}>문의 경로: {PRIVACY_POLICY_CONTACT_URL}</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.secondaryButton}
+            onPress={() => handleOpenExternalLink(getPrivacyPolicyLink(), '개인정보처리방침 열기 실패')}
+          >
+            <Text style={styles.secondaryButtonText}>외부 문서 열기</Text>
+          </TouchableOpacity>
         </View>
 
         {statusMessage ? (
@@ -540,6 +935,89 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.border,
     marginHorizontal: 14,
   },
+  updateCard: {
+    backgroundColor: COLORS.surfaceMuted,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    padding: 14,
+    gap: 10,
+  },
+  updateVersionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  updateVersionBlock: {
+    flex: 1,
+    gap: 6,
+  },
+  updateVersionValue: {
+    color: COLORS.text,
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  updateStatusChip: {
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  updateStatusChipCurrent: {
+    backgroundColor: COLORS.settledBg,
+  },
+  updateStatusChipWarning: {
+    backgroundColor: COLORS.unsettledBg,
+  },
+  updateStatusChipText: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  updateStatusChipTextCurrent: {
+    color: COLORS.settled,
+  },
+  updateStatusChipTextWarning: {
+    color: COLORS.unsettled,
+  },
+  updateHeadline: {
+    color: COLORS.text,
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  reminderSummaryCard: {
+    backgroundColor: COLORS.surfaceMuted,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    padding: 14,
+    gap: 8,
+  },
+  reminderTimeValue: {
+    color: COLORS.text,
+    fontSize: 22,
+    fontWeight: '800',
+  },
+  reminderStatusChip: {
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  reminderStatusChipActive: {
+    backgroundColor: COLORS.settledBg,
+  },
+  reminderStatusChipInactive: {
+    backgroundColor: COLORS.unsettledBg,
+  },
+  reminderStatusChipText: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  reminderStatusChipTextActive: {
+    color: COLORS.settled,
+  },
+  reminderStatusChipTextInactive: {
+    color: COLORS.unsettled,
+  },
   section: {
     backgroundColor: COLORS.surface,
     borderRadius: 22,
@@ -564,6 +1042,39 @@ const styles = StyleSheet.create({
   },
   exportButtonHalf: {
     flex: 1,
+  },
+  privacyCard: {
+    backgroundColor: COLORS.surfaceMuted,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    padding: 14,
+    gap: 8,
+  },
+  reminderPresetRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  reminderPresetButton: {
+    backgroundColor: COLORS.surfaceMuted,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  reminderPresetButtonActive: {
+    backgroundColor: '#EAF3DE',
+    borderColor: '#CFE3B5',
+  },
+  reminderPresetButtonText: {
+    color: COLORS.text,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  reminderPresetButtonTextActive: {
+    color: COLORS.settled,
   },
   primaryButton: {
     backgroundColor: COLORS.primary,

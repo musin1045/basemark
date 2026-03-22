@@ -1,6 +1,7 @@
 import 'react-native-gesture-handler';
 
 import Ionicons from '@expo/vector-icons/Ionicons';
+import { useEffect } from 'react';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -11,6 +12,14 @@ import InputScreen from './src/screens/InputScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import SettleScreen from './src/screens/SettleScreen';
 import SiteScreen from './src/screens/SiteScreen';
+import { getAppSetting } from './src/db/db';
+import {
+  DEFAULT_EVENING_REMINDER_SETTINGS,
+  EVENING_REMINDER_SETTING_KEY,
+  ensureNotificationHandlerConfigured,
+  normalizeEveningReminderSettings,
+  syncEveningReminderAsync,
+} from './src/lib/notifications';
 import { COLORS } from './src/lib/theme';
 
 const Tab = createBottomTabNavigator();
@@ -100,9 +109,45 @@ function HomeTabs() {
   );
 }
 
+function NotificationBootstrap() {
+  useEffect(() => {
+    let cancelled = false;
+
+    const bootstrapNotifications = async () => {
+      try {
+        ensureNotificationHandlerConfigured();
+        const rawValue = await getAppSetting(EVENING_REMINDER_SETTING_KEY, '');
+        if (cancelled) {
+          return;
+        }
+
+        let parsedValue = null;
+        if (rawValue) {
+          try {
+            parsedValue = JSON.parse(rawValue);
+          } catch {}
+        }
+
+        await syncEveningReminderAsync(
+          normalizeEveningReminderSettings(parsedValue ?? DEFAULT_EVENING_REMINDER_SETTINGS)
+        );
+      } catch {}
+    };
+
+    void bootstrapNotifications();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return null;
+}
+
 export default function App() {
   return (
     <SafeAreaProvider>
+      <NotificationBootstrap />
       <NavigationContainer theme={NAVIGATION_THEME}>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="Main" component={HomeTabs} />

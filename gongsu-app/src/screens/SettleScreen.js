@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -149,6 +150,12 @@ function getEntrySiteSummary(entry) {
   }
 
   return `${siteNames[0]} 외 ${siteNames.length - 1}`;
+}
+
+function buildSettlementPdfFilename(startDate, endDate) {
+  const normalizedStart = String(startDate ?? '').replace(/[^\d]/g, '');
+  const normalizedEnd = String(endDate ?? '').replace(/[^\d]/g, '');
+  return `gongsu-settlement-${normalizedStart || 'start'}-${normalizedEnd || 'end'}.pdf`;
 }
 
 export default function SettleScreen() {
@@ -481,16 +488,36 @@ export default function SettleScreen() {
 
     try {
       const { uri } = await Print.printToFileAsync({ html });
+      const baseDirectory = FileSystem.cacheDirectory ?? FileSystem.documentDirectory;
+      const shareUri =
+        baseDirectory && uri
+          ? `${baseDirectory}${buildSettlementPdfFilename(rangeStart, rangeEnd)}`
+          : uri;
+
+      if (shareUri && shareUri !== uri) {
+        try {
+          await FileSystem.deleteAsync(shareUri, {
+            idempotent: true,
+          });
+        } catch {}
+
+        await FileSystem.copyAsync({
+          from: uri,
+          to: shareUri,
+        });
+      }
+
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri, {
+        await Sharing.shareAsync(shareUri, {
           mimeType: 'application/pdf',
-          dialogTitle: `${rangeTitle} 정산 PDF`,
+          UTI: 'com.adobe.pdf',
+          dialogTitle: `${rangeTitle} 정산서 공유`,
         });
       } else {
-        Alert.alert('PDF가 생성되었습니다', uri);
+        Alert.alert('정산서가 생성되었습니다', shareUri);
       }
     } catch (error) {
-      Alert.alert('PDF 생성에 실패했습니다', error.message);
+      Alert.alert('정산서 공유에 실패했습니다', error.message);
     }
   };
 
@@ -828,8 +855,11 @@ export default function SettleScreen() {
             onPress={exportPdf}
             disabled={isBusy}
           >
-            <Text style={styles.exportButtonText}>선택 기간 정산 PDF 내보내기</Text>
+            <Text style={styles.exportButtonText}>정산서 공유하기</Text>
           </TouchableOpacity>
+        ) : null}
+        {entries.length > 0 ? (
+          <Text style={styles.exportHint}>카카오톡, 문자, 이메일, 드라이브로 바로 보낼 수 있습니다.</Text>
         ) : null}
       </ScrollView>
     </SafeAreaView>
@@ -1299,5 +1329,12 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '800',
+  },
+  exportHint: {
+    color: COLORS.textMuted,
+    fontSize: 12,
+    lineHeight: 18,
+    textAlign: 'center',
+    marginTop: -6,
   },
 });

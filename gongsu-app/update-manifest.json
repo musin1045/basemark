@@ -1,0 +1,14 @@
+{
+  "latestVersion": "1.0.0",
+  "minimumSupportedVersion": "1.0.0",
+  "publishedAt": "2026-03-22",
+  "releaseChannel": "codex/gosu",
+  "headline": "현재 버전이 최신입니다.",
+  "message": "백업 호환성, 정산 흐름 개선, 저녁 알림 준비를 반영한 배포 기준 버전입니다.",
+  "downloadUrl": "https://github.com/musin1045/basemark",
+  "notes": [
+    "정산 탭과 일일 입력 흐름 개선",
+    "다른 형식 백업 가져오기 보강",
+    "저녁 알림 설정 추가"
+  ]
+}

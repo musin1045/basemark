@@ -597,6 +597,12 @@ async function initializeDatabase() {
       created_at TEXT DEFAULT CURRENT_TIMESTAMP
     );
 
+    CREATE TABLE IF NOT EXISTS app_settings (
+      key TEXT PRIMARY KEY NOT NULL,
+      value TEXT,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+
     CREATE INDEX IF NOT EXISTS idx_records_date ON records(date);
   `);
 
@@ -625,6 +631,31 @@ export async function getDB() {
     databasePromise = initializeDatabase();
   }
   return databasePromise;
+}
+
+export async function getAppSetting(key, fallbackValue = null) {
+  const database = await getDB();
+  const row = await database.getFirstAsync(
+    'SELECT value FROM app_settings WHERE key = ?',
+    [key]
+  );
+
+  if (!row || row.value == null) {
+    return fallbackValue;
+  }
+
+  return row.value;
+}
+
+export async function setAppSetting(key, value) {
+  const database = await getDB();
+  await database.runAsync(
+    `
+      INSERT OR REPLACE INTO app_settings (key, value, updated_at)
+      VALUES (?, ?, CURRENT_TIMESTAMP)
+    `,
+    [key, value == null ? null : String(value)]
+  );
 }
 
 export async function getSites() {

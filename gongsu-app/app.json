@@ -9,7 +9,7 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#E6F4FE"
     },
     "ios": {
       "supportsTablet": true
@@ -22,11 +22,21 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       }
     },
+    "notification": {
+      "icon": "./assets/android-icon-monochrome.png",
+      "color": "#185FA5"
+    },
     "web": {
       "favicon": "./assets/favicon.png"
     },
+    "extra": {
+      "releaseChannel": "codex/gosu",
+      "updateManifestUrl": "https://github.com/musin1045/basemark/raw/codex/gosu/gongsu-app/update-manifest.json",
+      "privacyPolicyUrl": "https://github.com/musin1045/basemark/blob/codex/gosu/gongsu-app/privacy-policy.md"
+    },
     "plugins": [
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-notifications"
     ]
   }
 }
