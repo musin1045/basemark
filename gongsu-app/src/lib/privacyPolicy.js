@@ -1,17 +1,11 @@
-import { PRIVACY_POLICY_URL } from './releaseInfo';
+export const PRIVACY_POLICY_EFFECTIVE_DATE = '2026-03-23';
 
-export const PRIVACY_POLICY_EFFECTIVE_DATE = '2026-03-22';
+export const PRIVACY_POLICY_CONTACT_EMAIL = 'gosuking@gmail.com';
 
 export const PRIVACY_POLICY_SUMMARY = [
-  '이 앱은 현장, 공수, 단가, 정산 메모 같은 입력 데이터를 기본적으로 기기 안에만 저장합니다.',
-  '파일 가져오기, 내보내기, 공유를 직접 실행한 경우에만 사용자가 고른 위치나 앱으로 데이터가 전달됩니다.',
-  '저녁 알림을 켜면 알림 시간 설정과 로컬 알림 예약 정보만 기기 안에 저장하며, 서버로 푸시 토큰을 수집하지 않습니다.',
-  '앱 개발과 문의 창구는 GitHub 저장소 이슈 페이지를 기준으로 안내합니다.',
+  '공수로는 현장, 작업 내용, 공수, 단가, 금액, 메모, 정산 상태 같은 입력 데이터를 기본적으로 기기 안에만 저장합니다.',
+  '회원가입 정보, 연락처, 위치 정보, 광고 식별자 같은 추가 개인정보는 수집하지 않습니다.',
+  '백업 가져오기, 내보내기, 정산서 공유는 사용자가 직접 실행한 경우에만 선택한 저장 위치나 앱으로 데이터가 전달됩니다.',
+  '저녁 알림을 켜면 알림 시간 설정과 로컬 예약 정보만 기기에 저장하며, 서버 푸시 토큰은 수집하지 않습니다.',
+  '개인정보 처리 문의는 gosuking@gmail.com 으로 받을 수 있습니다.',
 ];
-
-export const PRIVACY_POLICY_CONTACT_URL =
-  'https://github.com/musin1045/basemark/issues';
-
-export function getPrivacyPolicyLink() {
-  return PRIVACY_POLICY_URL || PRIVACY_POLICY_CONTACT_URL;
-}

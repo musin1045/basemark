@@ -9,7 +9,7 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#E6F4FE"
+      "backgroundColor": "#D6E4F4"
     },
     "ios": {
       "bundleIdentifier": "com.gongsuro.app",
@@ -18,22 +18,21 @@
     "android": {
       "package": "com.gongsuro.app",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#0C447C",
         "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       }
     },
     "notification": {
       "icon": "./assets/android-icon-monochrome.png",
-      "color": "#185FA5"
+      "color": "#0C447C"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "extra": {
       "eas": {
-        "projectId": ""
+        "projectId": "6f94c2c1-ba98-4072-92c4-686de8158879"
       },
       "releaseChannel": "codex/gosu",
       "updateManifestUrl": "https://github.com/musin1045/basemark/raw/main/gongsu-app/update-manifest.json",
@@ -42,6 +41,7 @@
     "plugins": [
       "expo-sqlite",
       "expo-notifications"
-    ]
+    ],
+    "owner": "basemark"
   }
 }

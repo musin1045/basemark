@@ -33,8 +33,7 @@ import {
   syncEveningReminderAsync,
 } from '../lib/notifications';
 import {
-  getPrivacyPolicyLink,
-  PRIVACY_POLICY_CONTACT_URL,
+  PRIVACY_POLICY_CONTACT_EMAIL,
   PRIVACY_POLICY_EFFECTIVE_DATE,
   PRIVACY_POLICY_SUMMARY,
 } from '../lib/privacyPolicy';
@@ -836,24 +835,21 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>개인정보처리방침</Text>
           <Text style={styles.sectionCopy}>
-            스토어 제출과 사용자 안내에 맞춰 앱 안에서 바로 확인할 수 있도록 정리했습니다.
+            구글 Play 스토어 제출 기준에 맞춰 앱 안에서 바로 확인할 수 있도록 정리했습니다.
           </Text>
           <View style={styles.privacyCard}>
             <Text style={styles.summaryLabel}>시행일</Text>
-            <Text style={styles.noteText}>{PRIVACY_POLICY_EFFECTIVE_DATE}</Text>
+            <Text style={styles.privacyEffectiveDate}>{PRIVACY_POLICY_EFFECTIVE_DATE}</Text>
             {PRIVACY_POLICY_SUMMARY.map((line) => (
               <Text key={line} style={styles.noteText}>
                 {line}
               </Text>
             ))}
-            <Text style={styles.noteText}>문의 경로: {PRIVACY_POLICY_CONTACT_URL}</Text>
+            <View style={styles.privacyContactRow}>
+              <Text style={styles.summaryLabel}>문의처</Text>
+              <Text style={styles.privacyContactValue}>{PRIVACY_POLICY_CONTACT_EMAIL}</Text>
+            </View>
           </View>
-          <TouchableOpacity
-            style={styles.secondaryButton}
-            onPress={() => handleOpenExternalLink(getPrivacyPolicyLink(), '개인정보처리방침 열기 실패')}
-          >
-            <Text style={styles.secondaryButtonText}>외부 문서 열기</Text>
-          </TouchableOpacity>
         </View>
 
         {statusMessage ? (
@@ -1049,7 +1045,24 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.border,
     padding: 14,
-    gap: 8,
+    gap: 10,
+  },
+  privacyEffectiveDate: {
+    color: COLORS.text,
+    fontSize: 17,
+    fontWeight: '800',
+  },
+  privacyContactRow: {
+    marginTop: 4,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+    gap: 6,
+  },
+  privacyContactValue: {
+    color: COLORS.primary,
+    fontSize: 15,
+    fontWeight: '800',
   },
   reminderPresetRow: {
     flexDirection: 'row',
