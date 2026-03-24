@@ -1,3 +1,12 @@
+import { Dimensions } from 'react-native';
+
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
+}
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const FONT_BUMP = SCREEN_WIDTH >= 430 ? 2 : SCREEN_WIDTH >= 390 ? 1 : 0;
+
 export const COLORS = {
   primary: '#0C447C',
   primarySoft: '#165EAA',
@@ -19,6 +28,24 @@ export const COLORS = {
   danger: '#B9382A',
   success: '#2F855A',
   today: '#125AB0',
+};
+
+export const FONT = {
+  tiny: clamp(8 + FONT_BUMP * 0.35, 8, 9),
+  tinyStrong: clamp(8.5 + FONT_BUMP * 0.35, 8.5, 9.5),
+  xs: clamp(11 + FONT_BUMP, 11, 13),
+  sm: clamp(12 + FONT_BUMP, 12, 14),
+  body: clamp(13 + FONT_BUMP, 13, 15),
+  bodyLarge: clamp(14 + FONT_BUMP, 14, 16),
+  button: clamp(15 + FONT_BUMP, 15, 17),
+  title: clamp(16 + FONT_BUMP, 16, 18),
+  titleLarge: clamp(17 + FONT_BUMP, 17, 19),
+  heading: clamp(18 + FONT_BUMP, 18, 20),
+  hero: clamp(20 + FONT_BUMP, 20, 23),
+  pageTitle: clamp(24 + FONT_BUMP, 24, 27),
+  pageTitleLarge: clamp(26 + FONT_BUMP, 26, 29),
+  display: clamp(34 + FONT_BUMP, 34, 37),
+  tab: clamp(20 + FONT_BUMP, 20, 23),
 };
 
 export const SITE_COLORS = [

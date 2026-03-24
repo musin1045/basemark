@@ -709,6 +709,34 @@ export async function deleteSite(id) {
   await database.runAsync('DELETE FROM sites WHERE id = ?', [id]);
 }
 
+export async function deleteAllSites() {
+  const database = await getDB();
+  const existingSites = await database.getAllAsync(
+    'SELECT id, name, color FROM sites ORDER BY created_at ASC, id ASC'
+  );
+
+  if (existingSites.length === 0) {
+    return;
+  }
+
+  await database.execAsync('BEGIN TRANSACTION;');
+
+  try {
+    for (const site of existingSites) {
+      await database.runAsync(
+        'UPDATE records SET site_name = COALESCE(site_name, ?), site_color = COALESCE(site_color, ?) WHERE site_id = ?',
+        [site.name, site.color ?? DEFAULT_SITE.color, site.id]
+      );
+    }
+
+    await database.runAsync('DELETE FROM sites');
+    await database.execAsync('COMMIT;');
+  } catch (error) {
+    await database.execAsync('ROLLBACK;');
+    throw error;
+  }
+}
+
 export async function getRecordsByMonth(year, month) {
   const database = await getDB();
   const prefix = `${year}-${String(month).padStart(2, '0')}`;
@@ -922,6 +950,7 @@ async function prepareImportedData(payload, source = {}) {
       });
   const normalizedSites = imported.sites;
   const normalizedRecords = imported.records;
+  const allowSyntheticSites = imported.allowSyntheticSites !== false;
 
   if (normalizedSites.length === 0 && normalizedRecords.length === 0) {
     throw new Error('No importable sites or records were found. Check whether the file is JSON or CSV/TSV format.');
@@ -930,6 +959,7 @@ async function prepareImportedData(payload, source = {}) {
   return {
     normalizedSites,
     normalizedRecords,
+    allowSyntheticSites,
   };
 }
 
@@ -984,7 +1014,8 @@ function createSiteIdFactory(existingSites, importedSites) {
   };
 }
 
-function mergeImportedPayload(existingSites, existingRecords, importedSites, importedRecords) {
+function mergeImportedPayload(existingSites, existingRecords, importedSites, importedRecords, options = {}) {
+  const allowSyntheticSites = options.allowSyntheticSites !== false;
   const pickSiteId = createSiteIdFactory(existingSites, importedSites);
   const siteByName = new Map(
     existingSites
@@ -1005,6 +1036,10 @@ function mergeImportedPayload(existingSites, existingRecords, importedSites, imp
     const nameKey = normalizeSiteNameKey(name);
     if (siteByName.has(nameKey)) {
       return siteByName.get(nameKey);
+    }
+
+    if (!allowSyntheticSites) {
+      return null;
     }
 
     const createdSite = {
@@ -1178,7 +1213,10 @@ async function insertRecordRow(database, record) {
 export async function importBackupData(payload, source = {}) {
   const database = await getDB();
   const importMode = source.mode === 'merge' ? 'merge' : 'replace';
-  let { normalizedSites, normalizedRecords } = await prepareImportedData(payload, source);
+  let { normalizedSites, normalizedRecords, allowSyntheticSites } = await prepareImportedData(
+    payload,
+    source
+  );
 
   await database.execAsync('BEGIN TRANSACTION;');
 
@@ -1220,7 +1258,10 @@ export async function importBackupData(payload, source = {}) {
         existingSites,
         existingRecords,
         normalizedSites,
-        normalizedRecords
+        normalizedRecords,
+        {
+          allowSyntheticSites,
+        }
       );
 
       normalizedSites = mergedPayload.sites;
@@ -1229,13 +1270,6 @@ export async function importBackupData(payload, source = {}) {
 
     for (const site of normalizedSites) {
       await insertSiteRow(database, site);
-    }
-
-    if (importMode === 'replace' && normalizedSites.length === 0) {
-      await database.runAsync(
-        'INSERT INTO sites (name, unit_price, color) VALUES (?, ?, ?)',
-        [DEFAULT_SITE.name, DEFAULT_SITE.unitPrice, DEFAULT_SITE.color]
-      );
     }
 
     for (const record of normalizedRecords) {

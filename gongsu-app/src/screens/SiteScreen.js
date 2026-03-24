@@ -13,9 +13,10 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { useEffect } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { addSite, deleteSite, getSites, updateSite } from '../db/db';
+import { addSite, deleteAllSites, deleteSite, getSites, updateSite } from '../db/db';
 import { formatMoney } from '../lib/formatters';
 import { COLORS, SITE_COLORS } from '../lib/theme';
 
@@ -30,6 +31,7 @@ export default function SiteScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [editingSite, setEditingSite] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [deletingAll, setDeletingAll] = useState(false);
 
   const loadSites = useCallback(async () => {
     const loadedSites = await getSites();
@@ -41,6 +43,10 @@ export default function SiteScreen() {
       loadSites();
     }, [loadSites])
   );
+
+  useEffect(() => {
+    void loadSites();
+  }, [loadSites]);
 
   const averageUnitPrice = useMemo(() => {
     if (sites.length === 0) {
@@ -116,6 +122,35 @@ export default function SiteScreen() {
     );
   };
 
+  const handleDeleteAll = () => {
+    if (sites.length === 0 || deletingAll) {
+      return;
+    }
+
+    Alert.alert(
+      '현장을 전체 삭제할까요?',
+      `등록된 현장 ${sites.length}곳을 모두 삭제합니다.\n\n주의: 현장 목록과 단가 설정이 모두 지워집니다. 기존 기록은 현장명과 색상 스냅샷만 유지됩니다. 이 작업은 되돌릴 수 없습니다.`,
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '전체 삭제',
+          style: 'destructive',
+          onPress: async () => {
+            setDeletingAll(true);
+            try {
+              await deleteAllSites();
+              await loadSites();
+            } catch (error) {
+              Alert.alert('현장 전체 삭제에 실패했습니다', error?.message ?? '다시 시도해 주세요.');
+            } finally {
+              setDeletingAll(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <SafeAreaView style={styles.safe}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.background} />
@@ -126,9 +161,27 @@ export default function SiteScreen() {
           <Text style={styles.headerTitle}>현장 관리</Text>
           <Text style={styles.headerCopy}>현장별 단가와 색상을 관리합니다.</Text>
         </View>
-        <TouchableOpacity style={styles.addButton} onPress={openCreate}>
-          <Text style={styles.addButtonText}>새 현장</Text>
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={[
+              styles.bulkDeleteButton,
+              (sites.length === 0 || deletingAll) && styles.headerButtonDisabled,
+            ]}
+            onPress={handleDeleteAll}
+            disabled={sites.length === 0 || deletingAll}
+          >
+            <Text style={styles.bulkDeleteButtonText}>
+              {deletingAll ? '삭제 중...' : '전체 삭제'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.addButton, deletingAll && styles.headerButtonDisabled]}
+            onPress={openCreate}
+            disabled={deletingAll}
+          >
+            <Text style={styles.addButtonText}>새 현장</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.summaryRow}>
@@ -162,10 +215,10 @@ export default function SiteScreen() {
               <Text style={styles.sitePrice}>{formatMoney(item.unit_price)} / 1공수</Text>
             </View>
             <View style={styles.siteActions}>
-              <TouchableOpacity onPress={() => openEdit(item)}>
+              <TouchableOpacity onPress={() => openEdit(item)} disabled={deletingAll}>
                 <Text style={styles.editText}>수정</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => handleDelete(item)}>
+              <TouchableOpacity onPress={() => handleDelete(item)} disabled={deletingAll}>
                 <Text style={styles.deleteText}>삭제</Text>
               </TouchableOpacity>
             </View>
@@ -280,6 +333,10 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 6,
   },
+  headerActions: {
+    alignItems: 'flex-end',
+    gap: 8,
+  },
   addButton: {
     backgroundColor: COLORS.primary,
     borderRadius: 999,
@@ -290,6 +347,22 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '800',
+  },
+  bulkDeleteButton: {
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#EAB3B3',
+    backgroundColor: '#FFF5F5',
+  },
+  bulkDeleteButtonText: {
+    color: COLORS.danger,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  headerButtonDisabled: {
+    opacity: 0.5,
   },
   summaryRow: {
     flexDirection: 'row',

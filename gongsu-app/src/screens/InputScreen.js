@@ -23,15 +23,16 @@ import {
   getTodayKey,
   shiftDateKey,
 } from '../lib/formatters';
-import { COLORS, GONGSU_PALETTE } from '../lib/theme';
+import { COLORS, FONT, GONGSU_PALETTE } from '../lib/theme';
 
 const QUICK_OPTIONS = [
-  { key: '0.5', type: 'gongsu', value: 0.5, label: '0.5공' },
-  { key: '1', type: 'gongsu', value: 1, label: '1공' },
-  { key: '1.5', type: 'gongsu', value: 1.5, label: '1.5공' },
-  { key: '2', type: 'gongsu', value: 2, label: '2공' },
+  { key: '0.5', type: 'gongsu', value: 0.5, label: '0.5공수' },
+  { key: '1', type: 'gongsu', value: 1, label: '1공수' },
+  { key: '1.5', type: 'gongsu', value: 1.5, label: '1.5공수' },
+  { key: '2', type: 'gongsu', value: 2, label: '2공수' },
   { key: 'holiday', type: 'holiday', label: '휴무' },
 ];
+const MAX_GONGSU = 9.5;
 
 function createItemKey() {
   return `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
@@ -64,6 +65,16 @@ function formatDecimalInput(text) {
 
 function formatIntegerInput(text) {
   return String(text ?? '').replace(/[^\d]/g, '');
+}
+
+function clampGongsuValue(value) {
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return 0;
+  }
+
+  return Math.min(parsed, MAX_GONGSU);
 }
 
 function getQuickButtonColors(option) {
@@ -122,7 +133,7 @@ export default function InputScreen({ navigation, route }) {
         records.map((record) => ({
           key: String(record.id),
           taskName: record.task_name ?? '',
-          gongsu: Number(record.gongsu ?? 0),
+          gongsu: clampGongsuValue(record.gongsu),
           siteId: record.site_id ?? null,
           siteName: record.site_name ?? '',
           siteColor: record.site_color ?? COLORS.primarySoft,
@@ -137,7 +148,7 @@ export default function InputScreen({ navigation, route }) {
 
     const initialGongsu =
       Number.isFinite(Number(prefillGongsu)) && Number(prefillGongsu) > 0
-        ? Number(prefillGongsu)
+        ? clampGongsuValue(prefillGongsu)
         : 1;
 
     setHasSavedRecords(false);
@@ -215,7 +226,7 @@ export default function InputScreen({ navigation, route }) {
   };
 
   const updatePrimaryItemGongsu = (value) => {
-    updatePrimaryItem({ gongsu: value });
+    updatePrimaryItem({ gongsu: clampGongsuValue(value) });
   };
 
   const applySite = (key, site) => {
@@ -252,8 +263,7 @@ export default function InputScreen({ navigation, route }) {
   };
 
   const commitPrimaryGongsuInput = useCallback(() => {
-    const parsed = Number(formatDecimalInput(primaryGongsuInput));
-    const nextValue = Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+    const nextValue = clampGongsuValue(formatDecimalInput(primaryGongsuInput));
 
     updatePrimaryItemGongsu(nextValue);
     setPrimaryGongsuInput(toDisplayGongsu(nextValue));
@@ -288,7 +298,7 @@ export default function InputScreen({ navigation, route }) {
     const normalizedItems = items.map((item) => ({
       ...item,
       taskName: item.taskName.trim(),
-      gongsu: Number(item.gongsu) || 0,
+      gongsu: clampGongsuValue(item.gongsu),
       unitPrice: Number(item.unitPrice) || 0,
     }));
 
@@ -434,8 +444,12 @@ export default function InputScreen({ navigation, route }) {
               placeholderTextColor={COLORS.textSoft}
               value={primaryGongsuInput}
               onChangeText={(value) => {
-                setPrimaryGongsuInput(formatDecimalInput(value));
-                if (isHoliday && Number(formatDecimalInput(value)) > 0) {
+                const formattedValue = formatDecimalInput(value);
+                const clampedValue =
+                  Number(formattedValue) > MAX_GONGSU ? String(MAX_GONGSU) : formattedValue;
+
+                setPrimaryGongsuInput(clampedValue);
+                if (isHoliday && clampGongsuValue(clampedValue) > 0) {
                   setIsHoliday(false);
                 }
               }}
@@ -504,7 +518,7 @@ export default function InputScreen({ navigation, route }) {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.summaryCard}>
-            <View>
+            <View style={styles.summaryBlock}>
               <View style={styles.summaryLabelRow}>
                 <Text style={styles.summaryLabel}>총 합계</Text>
                 <View
@@ -523,11 +537,27 @@ export default function InputScreen({ navigation, route }) {
                   </Text>
                 </View>
               </View>
-              <Text style={styles.summaryValue}>{formatMoney(totalAmount)}</Text>
+              <Text
+                style={styles.summaryValue}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.68}
+                maxFontSizeMultiplier={1}
+              >
+                {formatMoney(totalAmount)}
+              </Text>
             </View>
-            <View>
+            <View style={[styles.summaryBlock, styles.summaryBlockRight]}>
               <Text style={styles.summaryLabel}>총 공수</Text>
-              <Text style={styles.summaryValue}>{formatGongsu(totalGongsu)} 공수</Text>
+              <Text
+                style={styles.summaryValue}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.74}
+                maxFontSizeMultiplier={1}
+              >
+                {formatGongsu(totalGongsu)} 공수
+              </Text>
             </View>
           </View>
 
@@ -593,7 +623,7 @@ export default function InputScreen({ navigation, route }) {
                         value={String(item.gongsu ?? 0)}
                         onChangeText={(value) =>
                           updateItem(item.key, {
-                            gongsu: Number(formatDecimalInput(value)) || 0,
+                            gongsu: clampGongsuValue(formatDecimalInput(value)),
                           })
                         }
                       />
@@ -732,7 +762,7 @@ const styles = StyleSheet.create({
   },
   loadingLabel: {
     color: COLORS.textMuted,
-    fontSize: 14,
+    fontSize: FONT.bodyLarge,
   },
   safe: {
     flex: 1,
@@ -755,12 +785,12 @@ const styles = StyleSheet.create({
   },
   headerIconText: {
     color: COLORS.primary,
-    fontSize: 14,
+    fontSize: FONT.bodyLarge,
     fontWeight: '700',
   },
   headerTitle: {
     color: COLORS.text,
-    fontSize: 18,
+    fontSize: FONT.heading,
     fontWeight: '800',
   },
   headerGhost: {
@@ -787,13 +817,13 @@ const styles = StyleSheet.create({
   },
   dateButtonText: {
     color: COLORS.primary,
-    fontSize: 20,
+    fontSize: FONT.hero,
     fontWeight: '700',
   },
   dateTitle: {
     flex: 1,
     color: COLORS.text,
-    fontSize: 16,
+    fontSize: FONT.title,
     fontWeight: '700',
     textAlign: 'center',
   },
@@ -823,7 +853,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
   topQuickButtonText: {
-    fontSize: 12,
+    fontSize: FONT.sm,
     fontWeight: '800',
   },
   topQuickInputRow: {
@@ -849,7 +879,7 @@ const styles = StyleSheet.create({
     borderColor: '#B7D8A0',
   },
   settleQuickButtonText: {
-    fontSize: 12,
+    fontSize: FONT.sm,
     fontWeight: '800',
   },
   settleQuickButtonIdleText: {
@@ -860,7 +890,7 @@ const styles = StyleSheet.create({
   },
   topQuickHint: {
     color: COLORS.textMuted,
-    fontSize: 12,
+    fontSize: FONT.sm,
     fontWeight: '600',
   },
   topQuickInput: {
@@ -871,7 +901,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     color: COLORS.text,
-    fontSize: 15,
+    fontSize: FONT.button,
     fontWeight: '600',
   },
   topQuickInputHalf: {
@@ -893,11 +923,19 @@ const styles = StyleSheet.create({
     padding: 18,
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
     gap: 12,
+  },
+  summaryBlock: {
+    flex: 1,
+    minWidth: 0,
+  },
+  summaryBlockRight: {
+    alignItems: 'flex-end',
   },
   summaryLabel: {
     color: 'rgba(255,255,255,0.72)',
-    fontSize: 12,
+    fontSize: FONT.sm,
     fontWeight: '600',
   },
   summaryLabelRow: {
@@ -917,7 +955,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 226, 194, 0.2)',
   },
   summaryStatusText: {
-    fontSize: 11,
+    fontSize: FONT.xs,
     fontWeight: '800',
   },
   summaryStatusTextSettled: {
@@ -928,7 +966,7 @@ const styles = StyleSheet.create({
   },
   summaryValue: {
     color: '#FFFFFF',
-    fontSize: 20,
+    fontSize: FONT.hero,
     fontWeight: '800',
     marginTop: 4,
   },
@@ -947,18 +985,18 @@ const styles = StyleSheet.create({
   },
   cardEyebrow: {
     color: COLORS.primary,
-    fontSize: 12,
+    fontSize: FONT.sm,
     fontWeight: '700',
   },
   cardTitle: {
     color: COLORS.text,
-    fontSize: 17,
+    fontSize: FONT.titleLarge,
     fontWeight: '700',
     marginTop: 4,
   },
   removeText: {
     color: COLORS.danger,
-    fontSize: 13,
+    fontSize: FONT.body,
     fontWeight: '700',
   },
   fieldGroup: {
@@ -966,7 +1004,7 @@ const styles = StyleSheet.create({
   },
   fieldLabel: {
     color: COLORS.textMuted,
-    fontSize: 13,
+    fontSize: FONT.body,
     fontWeight: '700',
   },
   textInput: {
@@ -977,7 +1015,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     color: COLORS.text,
-    fontSize: 15,
+    fontSize: FONT.button,
     fontWeight: '600',
   },
   taskInput: {
@@ -1016,17 +1054,17 @@ const styles = StyleSheet.create({
   },
   siteNameText: {
     color: COLORS.text,
-    fontSize: 15,
+    fontSize: FONT.button,
     fontWeight: '700',
   },
   sitePriceText: {
     color: COLORS.textMuted,
-    fontSize: 12,
+    fontSize: FONT.sm,
     marginTop: 2,
   },
   sitePickerAction: {
     color: COLORS.primary,
-    fontSize: 13,
+    fontSize: FONT.body,
     fontWeight: '800',
   },
   secondaryAction: {
@@ -1040,7 +1078,7 @@ const styles = StyleSheet.create({
   },
   secondaryActionText: {
     color: COLORS.primary,
-    fontSize: 15,
+    fontSize: FONT.button,
     fontWeight: '800',
   },
   optionsCard: {
@@ -1063,7 +1101,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     color: COLORS.text,
-    fontSize: 15,
+    fontSize: FONT.button,
     textAlignVertical: 'top',
   },
   footer: {
@@ -1093,7 +1131,7 @@ const styles = StyleSheet.create({
   },
   deleteButtonText: {
     color: COLORS.danger,
-    fontSize: 16,
+    fontSize: FONT.title,
     fontWeight: '800',
   },
   saveButton: {
@@ -1114,7 +1152,7 @@ const styles = StyleSheet.create({
   },
   saveButtonText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: FONT.title,
     fontWeight: '800',
   },
   modalOverlay: {
@@ -1139,12 +1177,12 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     color: COLORS.text,
-    fontSize: 18,
+    fontSize: FONT.heading,
     fontWeight: '800',
   },
   modalClose: {
     color: COLORS.primary,
-    fontSize: 14,
+    fontSize: FONT.bodyLarge,
     fontWeight: '700',
   },
   modalSiteItem: {

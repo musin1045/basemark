@@ -51,4 +51,4 @@
 
 개인정보처리방침 및 데이터 처리 관련 문의는 아래 이메일로 받을 수 있습니다.
 
-- 이메일: gosuking@gmail.com
+- 이메일: support@gongsuro.com

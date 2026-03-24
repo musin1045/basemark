@@ -34,6 +34,43 @@ export function compareVersions(leftVersion, rightVersion) {
   return 0;
 }
 
+function parsePublishedAt(value) {
+  const timestamp = Date.parse(String(value ?? '').trim());
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function choosePreferredManifest(bundledManifest, remoteManifest) {
+  const versionComparison = compareVersions(
+    remoteManifest.latestVersion,
+    bundledManifest.latestVersion
+  );
+
+  if (versionComparison > 0) {
+    return remoteManifest;
+  }
+
+  if (versionComparison < 0) {
+    return bundledManifest;
+  }
+
+  const minimumVersionComparison = compareVersions(
+    remoteManifest.minimumSupportedVersion,
+    bundledManifest.minimumSupportedVersion
+  );
+
+  if (minimumVersionComparison > 0) {
+    return remoteManifest;
+  }
+
+  if (minimumVersionComparison < 0) {
+    return bundledManifest;
+  }
+
+  return parsePublishedAt(remoteManifest.publishedAt) > parsePublishedAt(bundledManifest.publishedAt)
+    ? remoteManifest
+    : bundledManifest;
+}
+
 function normalizeManifest(rawManifest = {}, source = 'bundled') {
   const latestVersion = String(
     rawManifest?.latestVersion ?? rawManifest?.version ?? rawManifest?.latest ?? APP_VERSION
@@ -89,7 +126,8 @@ export function buildUpdateState(manifest) {
 }
 
 export async function checkForAppUpdate() {
-  let manifest = normalizeManifest(BUNDLED_MANIFEST, 'bundled');
+  const bundledManifest = normalizeManifest(BUNDLED_MANIFEST, 'bundled');
+  let manifest = bundledManifest;
   let fetchErrorMessage = '';
 
   if (UPDATE_MANIFEST_URL) {
@@ -105,7 +143,10 @@ export async function checkForAppUpdate() {
       }
 
       const remoteManifest = await response.json();
-      manifest = normalizeManifest(remoteManifest, 'remote');
+      manifest = choosePreferredManifest(
+        bundledManifest,
+        normalizeManifest(remoteManifest, 'remote')
+      );
     } catch (error) {
       fetchErrorMessage =
         String(error?.message ?? '').trim() || '업데이트 정보를 불러오지 못했습니다.';

@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "\uACF5\uC218\uB85C",
+    "name": "공수로",
     "slug": "gongsuro",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -21,7 +21,8 @@
         "backgroundColor": "#0C447C",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
-      }
+      },
+      "versionCode": 3
     },
     "notification": {
       "icon": "./assets/android-icon-monochrome.png",
@@ -36,7 +37,7 @@
       },
       "releaseChannel": "codex/gosu",
       "updateManifestUrl": "https://github.com/musin1045/basemark/raw/main/gongsu-app/update-manifest.json",
-      "privacyPolicyUrl": "https://github.com/musin1045/basemark/blob/main/gongsu-app/privacy-policy.md"
+      "privacyPolicyUrl": "https://gongsuro.com/privacy.html"
     },
     "plugins": [
       "expo-sqlite",

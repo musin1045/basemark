@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import {
   ActivityIndicator,
@@ -8,6 +8,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -21,10 +22,12 @@ import {
   getTodayKey,
   WEEKDAYS,
 } from '../lib/formatters';
-import { COLORS, GONGSU_PALETTE } from '../lib/theme';
+import { COLORS, FONT, GONGSU_PALETTE } from '../lib/theme';
 
 const CALENDAR_LINE_COLOR = '#C4D3E1';
 const CALENDAR_LINE_WIDTH = 1;
+const BADGE_RIGHT_GAP = 3;
+const BADGE_OFFSET_X = -2;
 
 function getEntryPalette(entry) {
   return {
@@ -152,10 +155,12 @@ function getCellNote(entry) {
 
 export default function HomeScreen({ navigation }) {
   const today = new Date();
+  const { width } = useWindowDimensions();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth() + 1);
   const [dateMap, setDateMap] = useState({});
   const [loading, setLoading] = useState(true);
+  const calendarScale = Math.min(Math.max(width / 390, 0.92), 1.28);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -172,6 +177,10 @@ export default function HomeScreen({ navigation }) {
       loadData();
     }, [loadData])
   );
+
+  useEffect(() => {
+    void loadData();
+  }, [loadData]);
 
   const previousMonth = () => {
     if (month === 1) {
@@ -206,6 +215,50 @@ export default function HomeScreen({ navigation }) {
 
     return rows;
   }, [year, month]);
+
+  const responsiveCellStyles = useMemo(
+    () => ({
+      daySlot: {
+        minHeight: 104 * calendarScale,
+      },
+      emptyCell: {
+        minHeight: 104 * calendarScale,
+      },
+      dayTopRow: {
+        minHeight: 24 * calendarScale,
+        gap: Math.max(2, 2 * calendarScale),
+      },
+      dayNumberWrap: {
+        minWidth: 22 * calendarScale,
+      },
+      dayNumber: {
+        fontSize: FONT.titleLarge * calendarScale,
+        lineHeight: FONT.titleLarge * calendarScale + 1,
+      },
+      gongsuBadge: {
+        width: FONT.xs * calendarScale * 2.05,
+        borderRadius: 6 * calendarScale,
+        paddingHorizontal: 0,
+        paddingVertical: Math.max(1, calendarScale - 0.2),
+        transform: [{ translateX: BADGE_OFFSET_X }],
+      },
+      gongsuBadgeText: {
+        fontSize: FONT.xs * calendarScale,
+        lineHeight: FONT.xs * calendarScale + 1,
+      },
+      cellAmount: {
+        fontSize: FONT.sm * Math.min(calendarScale, 1.16),
+      },
+      siteRow: {
+        minHeight: 20 * Math.min(calendarScale, 1.16),
+      },
+      siteText: {
+        fontSize: (FONT.xs - 1) * Math.min(calendarScale, 1.18),
+        lineHeight: FONT.xs * Math.min(calendarScale, 1.14),
+      },
+    }),
+    [calendarScale]
+  );
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -283,7 +336,11 @@ export default function HomeScreen({ navigation }) {
                       return (
                         <View
                           key={`empty-${rowIndex}-${colIndex}`}
-                          style={[styles.emptyCell, colIndex === 6 && styles.lastColumn]}
+                          style={[
+                            styles.emptyCell,
+                            responsiveCellStyles.emptyCell,
+                            colIndex === 6 && styles.lastColumn,
+                          ]}
                         />
                       );
                     }
@@ -294,12 +351,19 @@ export default function HomeScreen({ navigation }) {
                     const badgePalette = getGongsuBadgePalette(entry);
                     const cellNote = getCellNote(entry);
                     const siteSummary = getSiteSummary(entry);
+                    const shouldCenterMeta = Boolean(
+                      entry && !cellNote && (entry.totalAmount > 0 || siteSummary)
+                    );
                     const isToday = dateKey === todayKey;
 
                     return (
                       <View
                         key={dateKey}
-                        style={[styles.daySlot, colIndex === 6 && styles.lastColumn]}
+                        style={[
+                          styles.daySlot,
+                          responsiveCellStyles.daySlot,
+                          colIndex === 6 && styles.lastColumn,
+                        ]}
                       >
                         <TouchableOpacity
                           style={[styles.dayInner, { backgroundColor: palette.backgroundColor }]}
@@ -308,25 +372,27 @@ export default function HomeScreen({ navigation }) {
                         >
                           {isToday ? <View style={styles.todayRing} /> : null}
 
-                          <View style={styles.dayTopRow}>
-                            <View style={styles.dayNumberWrap}>
+                          <View style={[styles.dayTopRow, responsiveCellStyles.dayTopRow]}>
+                            <View style={[styles.dayNumberWrap, responsiveCellStyles.dayNumberWrap]}>
                               <Text
                                 style={[
                                   styles.dayNumber,
+                                  responsiveCellStyles.dayNumber,
                                   { color: palette.dayColor },
                                   colIndex === 0 && !entry && styles.sundayText,
                                   colIndex === 6 && !entry && styles.saturdayText,
                                 ]}
                                 numberOfLines={1}
+                                maxFontSizeMultiplier={1}
                               >
                                 {day}
                               </Text>
                             </View>
-
                             {badgePalette ? (
                               <View
                                 style={[
                                   styles.gongsuBadge,
+                                  responsiveCellStyles.gongsuBadge,
                                   {
                                     backgroundColor: badgePalette.backgroundColor,
                                     borderColor: badgePalette.borderColor,
@@ -334,44 +400,81 @@ export default function HomeScreen({ navigation }) {
                                 ]}
                               >
                                 <Text
-                                  style={[styles.gongsuBadgeText, { color: badgePalette.textColor }]}
+                                  style={[
+                                    styles.gongsuBadgeText,
+                                    responsiveCellStyles.gongsuBadgeText,
+                                    { color: badgePalette.textColor },
+                                  ]}
                                   numberOfLines={1}
                                   adjustsFontSizeToFit
-                                  minimumFontScale={0.8}
+                                  minimumFontScale={0.74}
+                                  maxFontSizeMultiplier={1}
                                 >
                                   {badgePalette.label}
                                 </Text>
                               </View>
-                            ) : (
-                              <View style={styles.badgeSpacer} />
-                            )}
+                            ) : null}
                           </View>
 
-                          <View style={styles.cellMiddle}>
+                          <View
+                            style={[
+                              styles.cellMiddle,
+                              shouldCenterMeta && styles.cellMiddleWithoutNote,
+                            ]}
+                          >
                             {cellNote ? (
-                              <Text style={styles.cellNote} numberOfLines={2} ellipsizeMode="tail">
+                              <Text
+                                style={styles.cellNote}
+                                numberOfLines={2}
+                                ellipsizeMode="tail"
+                                maxFontSizeMultiplier={1}
+                              >
                                 {cellNote}
                               </Text>
                             ) : null}
                           </View>
 
-                          <View style={styles.cellMeta}>
-                            <View style={styles.cellAmountRow}>
+                          <View
+                            style={[
+                              styles.cellMeta,
+                              shouldCenterMeta && styles.cellMetaCentered,
+                            ]}
+                          >
+                            <View
+                              style={[
+                                styles.cellAmountRow,
+                                shouldCenterMeta && styles.cellAmountRowCentered,
+                              ]}
+                            >
                               {entry ? (
                                 <Text
-                                  style={styles.cellAmount}
+                                  style={[styles.cellAmount, responsiveCellStyles.cellAmount]}
                                   numberOfLines={1}
                                   adjustsFontSizeToFit
                                   minimumFontScale={0.72}
+                                  maxFontSizeMultiplier={1}
                                 >
                                   {formatCellAmount(entry.totalAmount)}
                                 </Text>
                               ) : null}
                             </View>
 
-                            <View style={styles.siteRow}>
+                            <View
+                              style={[
+                                styles.siteRow,
+                                responsiveCellStyles.siteRow,
+                                shouldCenterMeta && styles.siteRowCentered,
+                              ]}
+                            >
                               {siteSummary ? (
-                                <Text style={styles.siteText} numberOfLines={1} ellipsizeMode="tail">
+                                <Text
+                                  style={[styles.siteText, responsiveCellStyles.siteText]}
+                                  numberOfLines={1}
+                                  ellipsizeMode="tail"
+                                  adjustsFontSizeToFit
+                                  minimumFontScale={0.62}
+                                  maxFontSizeMultiplier={1}
+                                >
                                   {siteSummary}
                                 </Text>
                               ) : null}
@@ -424,12 +527,12 @@ const styles = StyleSheet.create({
   },
   navButtonText: {
     color: '#FFFFFF',
-    fontSize: 20,
+    fontSize: FONT.hero,
     fontWeight: '700',
   },
   headerTitle: {
     color: '#FFFFFF',
-    fontSize: 24,
+    fontSize: FONT.pageTitle,
     fontWeight: '800',
   },
   primaryAction: {
@@ -440,7 +543,7 @@ const styles = StyleSheet.create({
   },
   primaryActionText: {
     color: COLORS.primary,
-    fontSize: 13,
+    fontSize: FONT.body,
     fontWeight: '800',
   },
   headerStats: {
@@ -457,12 +560,12 @@ const styles = StyleSheet.create({
   },
   headerStatLabel: {
     color: 'rgba(255,255,255,0.7)',
-    fontSize: 12,
+    fontSize: FONT.sm,
     fontWeight: '600',
   },
   headerStatValue: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: FONT.title,
     fontWeight: '800',
   },
   headerStatDivider: {
@@ -506,7 +609,7 @@ const styles = StyleSheet.create({
   weekLabel: {
     textAlign: 'center',
     color: COLORS.textMuted,
-    fontSize: 12,
+    fontSize: FONT.sm,
     fontWeight: '700',
   },
   sundayText: {
@@ -524,7 +627,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     color: COLORS.textMuted,
-    fontSize: 13,
+    fontSize: FONT.body,
   },
   calendarRow: {
     flexDirection: 'row',
@@ -533,14 +636,14 @@ const styles = StyleSheet.create({
   },
   daySlot: {
     flex: 1,
-    minHeight: 100,
+    minHeight: 104,
     borderRightWidth: CALENDAR_LINE_WIDTH,
     borderRightColor: CALENDAR_LINE_COLOR,
     backgroundColor: '#FFFFFF',
   },
   emptyCell: {
     flex: 1,
-    minHeight: 100,
+    minHeight: 104,
     borderRightWidth: CALENDAR_LINE_WIDTH,
     borderRightColor: CALENDAR_LINE_COLOR,
     backgroundColor: '#FCFDFE',
@@ -550,9 +653,10 @@ const styles = StyleSheet.create({
   },
   dayInner: {
     flex: 1,
-    paddingHorizontal: 4,
-    paddingTop: 4,
-    paddingBottom: 4,
+    paddingLeft: 5,
+    paddingRight: BADGE_RIGHT_GAP,
+    paddingTop: 5,
+    paddingBottom: 5,
   },
   todayRing: {
     position: 'absolute',
@@ -566,40 +670,39 @@ const styles = StyleSheet.create({
   },
   dayTopRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    minHeight: 18,
-    gap: 3,
+    minHeight: 24,
+    gap: 2,
   },
   dayNumberWrap: {
-    minWidth: 16,
+    minWidth: 22,
     flexShrink: 0,
   },
   dayNumber: {
     color: COLORS.text,
-    fontSize: 12,
+    fontSize: FONT.titleLarge,
     fontWeight: '800',
-    lineHeight: 14,
+    lineHeight: FONT.titleLarge + 1,
     includeFontPadding: false,
   },
   gongsuBadge: {
-    minWidth: 24,
-    height: 16,
-    borderRadius: 4,
+    width: 26,
+    borderRadius: 6,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 2,
-  },
-  badgeSpacer: {
-    width: 24,
-    height: 16,
+    paddingHorizontal: 0,
+    paddingVertical: 1,
+    flexShrink: 0,
+    transform: [{ translateX: BADGE_OFFSET_X }],
   },
   gongsuBadgeText: {
-    fontSize: 7,
-    lineHeight: 8,
+    fontSize: FONT.xs,
+    lineHeight: FONT.xs + 1,
     fontWeight: '800',
     textAlign: 'center',
+    letterSpacing: -0.15,
     includeFontPadding: false,
   },
   cellMiddle: {
@@ -609,41 +712,61 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
     paddingTop: 4,
   },
+  cellMiddleWithoutNote: {
+    flex: 0,
+    minHeight: 0,
+    paddingTop: 0,
+  },
   cellNote: {
-    fontSize: 8,
-    lineHeight: 10,
+    fontSize: FONT.xs,
+    lineHeight: FONT.xs + 3,
     fontWeight: '700',
     color: COLORS.textMuted,
     textAlign: 'center',
   },
   cellMeta: {
     justifyContent: 'flex-end',
-    paddingTop: 6,
+    paddingTop: 7,
+  },
+  cellMetaCentered: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingTop: 2,
+    paddingBottom: 4,
   },
   cellAmountRow: {
-    minHeight: 16,
+    minHeight: 20,
     justifyContent: 'flex-end',
     alignItems: 'center',
     paddingHorizontal: 1,
   },
+  cellAmountRowCentered: {
+    justifyContent: 'center',
+  },
   cellAmount: {
-    fontSize: 8.5,
+    fontSize: FONT.sm,
     fontWeight: '700',
     color: COLORS.textMuted,
     textAlign: 'center',
   },
   siteRow: {
-    minHeight: 14,
+    minHeight: 20,
     justifyContent: 'flex-end',
     alignItems: 'center',
-    paddingHorizontal: 2,
-    marginTop: 2,
+    paddingHorizontal: 0,
+    marginTop: 0,
+  },
+  siteRowCentered: {
+    justifyContent: 'center',
+    marginTop: 1,
   },
   siteText: {
-    fontSize: 8,
-    lineHeight: 10,
-    fontWeight: '700',
+    width: '100%',
+    fontSize: FONT.xs - 1,
+    lineHeight: FONT.xs,
+    fontWeight: '800',
     color: COLORS.textSoft,
     textAlign: 'center',
+    letterSpacing: -0.2,
   },
 });

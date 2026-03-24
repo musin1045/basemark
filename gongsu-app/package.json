@@ -6,7 +6,8 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "release:helper": "node scripts/releaseHelper.mjs"
   },
   "dependencies": {
     "@react-navigation/bottom-tabs": "^7.15.6",

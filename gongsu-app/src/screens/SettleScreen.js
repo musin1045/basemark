@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { useEffect } from 'react';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
@@ -128,6 +129,26 @@ function getRangeTitle(startDate, endDate) {
   return `${startDate} ~ ${endDate}`;
 }
 
+function normalizeSiteName(value) {
+  return String(value ?? '')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+function getSiteSummaryKey(item) {
+  const normalizedName = normalizeSiteName(item?.site_name);
+
+  if (normalizedName) {
+    return `name:${normalizedName.toLocaleLowerCase('ko-KR')}`;
+  }
+
+  if (item?.site_id != null) {
+    return `id:${item.site_id}`;
+  }
+
+  return 'unknown';
+}
+
 function getEntrySiteSummary(entry) {
   if (!entry?.items?.length) {
     return '';
@@ -136,7 +157,7 @@ function getEntrySiteSummary(entry) {
   const siteNames = [
     ...new Set(
       entry.items
-        .map((item) => String(item.site_name ?? '').trim())
+        .map((item) => normalizeSiteName(item.site_name))
         .filter(Boolean)
     ),
   ];
@@ -225,6 +246,10 @@ export default function SettleScreen() {
     }, [loadDataForRange])
   );
 
+  useEffect(() => {
+    void loadDataForRange(rangeRef.current.start, rangeRef.current.end);
+  }, [loadDataForRange]);
+
   const entries = useMemo(
     () => Object.values(dateMap).sort((left, right) => left.date.localeCompare(right.date)),
     [dateMap]
@@ -278,7 +303,8 @@ export default function SettleScreen() {
 
     entries.forEach((entry) => {
       entry.items.forEach((item) => {
-        const key = item.site_id ?? `snapshot:${item.site_name}`;
+        const key = getSiteSummaryKey(item);
+        const siteName = normalizeSiteName(item.site_name) || '미지정 현장';
         const current = map.get(key) ?? {
           key,
           siteName: item.site_name || '미지정 현장',
@@ -288,9 +314,13 @@ export default function SettleScreen() {
           unsettledAmount: 0,
         };
 
+        current.siteName = siteName;
         current.totalGongsu += Number(item.gongsu || 0);
         current.totalAmount += Number(item.amount || 0);
         current.unsettledAmount += entry.isSettled ? 0 : Number(item.amount || 0);
+        if (current.siteColor === COLORS.primarySoft && item.site_color) {
+          current.siteColor = item.site_color;
+        }
 
         map.set(key, current);
       });

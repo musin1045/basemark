@@ -814,6 +814,41 @@ function normalizeSiteCollection(value) {
   });
 }
 
+function hasOwnProperty(value, key) {
+  return Object.prototype.hasOwnProperty.call(value, key);
+}
+
+export function hasExplicitSiteCollection(payload) {
+  if (Array.isArray(payload) || !isPlainObject(payload)) {
+    return false;
+  }
+
+  for (const container of collectContainers(payload)) {
+    for (const key of SITE_KEYS) {
+      if (hasOwnProperty(container, key)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+export function isAuthoritativeSiteBackupPayload(payload) {
+  if (Array.isArray(payload) || !isPlainObject(payload)) {
+    return false;
+  }
+
+  for (const container of collectContainers(payload)) {
+    const appId = String(container.app ?? container.appId ?? '').trim().toLowerCase();
+    if (appId === 'gongsu-app') {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 function extractRawSites(payload) {
   if (Array.isArray(payload)) {
     return [];
@@ -821,6 +856,10 @@ function extractRawSites(payload) {
 
   for (const container of collectContainers(payload)) {
     for (const key of SITE_KEYS) {
+      if (!hasOwnProperty(container, key)) {
+        continue;
+      }
+
       const sites = normalizeSiteCollection(container[key]);
       if (sites.length > 0) {
         return sites;
@@ -1098,6 +1137,7 @@ function normalizeRecordBackup(record, index, options) {
 
 function ensureSiteCoverage(sites, records, options) {
   const fallback = options.defaultSite ?? DEFAULT_SITE_IMPORT;
+  const allowSyntheticSites = options.allowSyntheticSites !== false;
   const nextSites = [...sites];
   const siteById = new Map();
   const siteByName = new Map();
@@ -1146,6 +1186,10 @@ function ensureSiteCoverage(sites, records, options) {
       return siteByName.get(record.siteName);
     }
 
+    if (!allowSyntheticSites) {
+      return null;
+    }
+
     const site = {
       id: makeSiteId(record.siteId),
       name: record.siteName,
@@ -1187,6 +1231,8 @@ function ensureSiteCoverage(sites, records, options) {
 }
 
 export function normalizeBackupImport(payload, options = {}) {
+  const authoritativeSiteBackup = isAuthoritativeSiteBackupPayload(payload);
+  const explicitSiteCollection = hasExplicitSiteCollection(payload);
   const rawSites = extractRawSites(payload);
   const rawRecords = extractRawRecords(payload);
   const normalizedSites = rawSites
@@ -1195,8 +1241,19 @@ export function normalizeBackupImport(payload, options = {}) {
   const normalizedRecords = rawRecords
     .map((record, index) => normalizeRecordBackup(record, index, options))
     .filter(Boolean);
+  const allowSyntheticSites =
+    options.allowSyntheticSites ?? !authoritativeSiteBackup;
+  const normalized = ensureSiteCoverage(normalizedSites, normalizedRecords, {
+    ...options,
+    allowSyntheticSites,
+  });
 
-  return ensureSiteCoverage(normalizedSites, normalizedRecords, options);
+  return {
+    ...normalized,
+    hasExplicitSiteCollection: explicitSiteCollection,
+    isAuthoritativeSiteBackup: authoritativeSiteBackup,
+    allowSyntheticSites,
+  };
 }
 
 export function parseAndNormalizeBackupImport(input, options = {}) {
