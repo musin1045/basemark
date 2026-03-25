@@ -1,4 +1,4 @@
-{
+﻿{
   "expo": {
     "name": "공수로",
     "slug": "gongsuro",
@@ -24,10 +24,6 @@
       },
       "versionCode": 3
     },
-    "notification": {
-      "icon": "./assets/android-icon-monochrome.png",
-      "color": "#0C447C"
-    },
     "web": {
       "favicon": "./assets/favicon.png"
     },
@@ -40,8 +36,7 @@
       "privacyPolicyUrl": "https://gongsuro.com/privacy.html"
     },
     "plugins": [
-      "expo-sqlite",
-      "expo-notifications"
+      "expo-sqlite"
     ],
     "owner": "basemark"
   }

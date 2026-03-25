@@ -1,4 +1,4 @@
-{
+﻿{
   "name": "gongsu-app",
   "version": "1.0.0",
   "main": "index.js",
@@ -16,7 +16,6 @@
     "expo": "~54.0.0",
     "expo-document-picker": "~14.0.8",
     "expo-file-system": "~19.0.21",
-    "expo-notifications": "~0.32.16",
     "expo-print": "~15.0.8",
     "expo-sharing": "~14.0.8",
     "expo-sqlite": "~16.0.10",

@@ -1,14 +1,73 @@
-import fs from 'node:fs/promises';
+﻿import fs from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
+import os from 'node:os';
 import { spawn } from 'node:child_process';
 
 const EDGE_PATH = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
 const DEBUG_PORT = 9223;
 const BASE_URL = 'http://localhost:8081';
-const PROFILE_DIR = path.resolve('.store-browser-profile');
+const PROFILE_DIR = path.join(os.tmpdir(), 'gongsuro-store-browser-profile');
 const OUTPUT_DIR = path.resolve('store-assets', 'play');
 const SCREENSHOT_DIR = path.join(OUTPUT_DIR, 'screenshots');
+const STORAGE_KEY = 'gongsu-web-db-v1';
+
+const SEEDED_STATE = {
+  sites: [
+    { id: 1, name: '성수 리모델링', unit_price: 180000, color: '#185FA5', created_at: '2026-03-01T08:00:00.000Z' },
+    { id: 2, name: '광교 상가 보수', unit_price: 165000, color: '#2B7A4B', created_at: '2026-03-02T08:00:00.000Z' },
+    { id: 3, name: '분당 주택 설비', unit_price: 200000, color: '#C56A1A', created_at: '2026-03-03T08:00:00.000Z' },
+  ],
+  records: [
+    {
+      id: 1,
+      date: '2026-03-24',
+      site_id: 1,
+      site_name: '성수 리모델링',
+      site_color: '#185FA5',
+      task_name: '천장 보수',
+      gongsu: 1,
+      unit_price: 180000,
+      amount: 180000,
+      memo: '오전 자재 반입 후 마감',
+      is_settled: 1,
+      is_holiday: 0,
+      created_at: '2026-03-24T09:00:00.000Z',
+    },
+    {
+      id: 2,
+      date: '2026-03-25',
+      site_id: 2,
+      site_name: '광교 상가 보수',
+      site_color: '#2B7A4B',
+      task_name: '바닥 철거',
+      gongsu: 1.5,
+      unit_price: 165000,
+      amount: 247500,
+      memo: '폐기물 정리 포함',
+      is_settled: 0,
+      is_holiday: 0,
+      created_at: '2026-03-25T09:00:00.000Z',
+    },
+    {
+      id: 3,
+      date: '2026-03-25',
+      site_id: 3,
+      site_name: '분당 주택 설비',
+      site_color: '#C56A1A',
+      task_name: '배관 교체',
+      gongsu: 2,
+      unit_price: 200000,
+      amount: 400000,
+      memo: '오후 누수 점검 완료',
+      is_settled: 0,
+      is_holiday: 0,
+      created_at: '2026-03-25T11:30:00.000Z',
+    },
+  ],
+  app_settings: {},
+  counters: { site: 4, record: 4 },
+};
 
 function delay(ms) {
   return new Promise((resolve) => {
@@ -21,10 +80,7 @@ async function ensureDir(targetPath) {
 }
 
 async function resetDir(targetPath) {
-  await fs.rm(targetPath, {
-    recursive: true,
-    force: true,
-  });
+  await fs.rm(targetPath, { recursive: true, force: true });
   await ensureDir(targetPath);
 }
 
@@ -58,8 +114,7 @@ class CDPClient {
 
   send(method, params = {}) {
     const id = this.nextId++;
-    const payload = { id, method, params };
-    this.socket.send(JSON.stringify(payload));
+    this.socket.send(JSON.stringify({ id, method, params }));
 
     return new Promise((resolve, reject) => {
       this.pending.set(id, { resolve, reject });
@@ -153,10 +208,8 @@ async function waitFor(client, predicateExpression, timeoutMs, description) {
 }
 
 async function goto(client, relativePath) {
-  await client.send('Page.navigate', {
-    url: `${BASE_URL}${relativePath}`,
-  });
-  await delay(1500);
+  await client.send('Page.navigate', { url: `${BASE_URL}${relativePath}` });
+  await delay(1800);
 }
 
 function escapeForJs(value) {
@@ -205,38 +258,7 @@ async function clickByText(client, text) {
   if (!clicked) {
     throw new Error(`Could not find clickable text: ${text}`);
   }
-  await delay(500);
-}
-
-async function setInputValue(client, placeholder, value) {
-  const expression = `
-    (() => {
-      const placeholderText = ${escapeForJs(placeholder)};
-      const nextValue = ${escapeForJs(value)};
-      const element = [...document.querySelectorAll('input, textarea')]
-        .find((candidate) => candidate.getAttribute('placeholder') === placeholderText);
-      if (!element) {
-        return false;
-      }
-
-      element.focus();
-      const prototype = element.tagName === 'TEXTAREA'
-        ? HTMLTextAreaElement.prototype
-        : HTMLInputElement.prototype;
-      const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
-      descriptor.set.call(element, nextValue);
-      element.dispatchEvent(new Event('input', { bubbles: true }));
-      element.dispatchEvent(new Event('change', { bubbles: true }));
-      element.blur();
-      return true;
-    })();
-  `;
-
-  const updated = await client.evaluate(expression);
-  if (!updated) {
-    throw new Error(`Could not find input with placeholder: ${placeholder}`);
-  }
-  await delay(350);
+  await delay(600);
 }
 
 async function scrollToText(client, text) {
@@ -275,34 +297,29 @@ async function setupViewport(client) {
   });
 }
 
-async function createSites(client) {
-  await waitFor(
-    client,
-    `document.body.innerText.includes('오늘 입력')`,
-    15000,
-    'home screen before navigating to site manager'
-  );
-  await clickByText(client, '현장');
-  await waitFor(
-    client,
-    `document.body.innerText.includes('현장 관리')`,
-    15000,
-    'site manager screen'
-  );
-  await delay(2000);
-  await client.screenshot('02-sites.png');
+async function seedDemoData(client) {
+  await client.evaluate(`
+    (() => {
+      localStorage.setItem(${escapeForJs(STORAGE_KEY)}, ${escapeForJs(JSON.stringify(SEEDED_STATE))});
+      return true;
+    })();
+  `);
 }
 
 async function captureHome(client) {
   await goto(client, '/');
-  await waitFor(
-    client,
-    `document.body.innerText.includes('오늘 입력')`,
-    15000,
-    'home screen'
-  );
-  await delay(6000);
+  await seedDemoData(client);
+  await goto(client, '/');
+  await waitFor(client, `document.body.innerText.includes('오늘 입력')`, 15000, 'home screen');
+  await delay(1200);
   await client.screenshot('01-home.png');
+}
+
+async function captureSites(client) {
+  await clickByText(client, '현장');
+  await waitFor(client, `document.body.innerText.includes('현장 관리')`, 15000, 'sites screen');
+  await delay(1200);
+  await client.screenshot('02-sites.png');
 }
 
 async function captureSettlement(client) {
@@ -313,21 +330,17 @@ async function captureSettlement(client) {
     15000,
     'settlement screen'
   );
-  await delay(2000);
+  await delay(1200);
   await client.screenshot('03-settle.png');
 }
 
 async function captureSettings(client) {
   await clickByText(client, '설정');
-  await waitFor(
-    client,
-    `document.body.innerText.includes('개인정보처리방침')`,
-    15000,
-    'settings screen'
-  );
-  await delay(2000);
+  await waitFor(client, `document.body.innerText.includes('개인정보처리방침')`, 15000, 'settings screen');
+  await delay(1200);
   await client.screenshot('04-settings-top.png');
   await scrollToText(client, '개인정보처리방침');
+  await delay(600);
   await client.screenshot('05-settings-privacy.png');
 }
 
@@ -342,14 +355,13 @@ async function main() {
     client = await connectToTarget();
     await setupViewport(client);
     await captureHome(client);
-    await createSites(client);
+    await captureSites(client);
     await captureSettlement(client);
     await captureSettings(client);
   } finally {
     if (client?.socket?.readyState === WebSocket.OPEN) {
       client.socket.close();
     }
-
     browser.kill('SIGTERM');
   }
 }
@@ -358,3 +370,4 @@ main().catch((error) => {
   console.error(error);
   process.exitCode = 1;
 });
+

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ko">
   <head>
     <meta charset="utf-8" />
@@ -7,7 +7,7 @@
     <link rel="canonical" href="https://gongsuro.com/privacy.html" />
     <meta
       name="description"
-      content="공수로(Gongsuro) 개인정보처리방침. 공수로는 작업 기록 데이터를 기본적으로 기기 내부에만 저장합니다."
+      content="공수로(Gongsuro) 개인정보처리방침. 공수로는 공수 기록과 정산 데이터를 기본적으로 사용자 기기 내부에만 저장합니다."
     />
     <style>
       :root {
@@ -22,10 +22,7 @@
         --primary-soft: #165eaa;
       }
 
-      * {
-        box-sizing: border-box;
-      }
-
+      * { box-sizing: border-box; }
       body {
         margin: 0;
         font-family: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
@@ -34,152 +31,53 @@
           linear-gradient(180deg, #f5f9fd 0%, var(--bg) 100%);
         color: var(--text);
       }
-
-      .page {
-        max-width: 880px;
-        margin: 0 auto;
-        padding: 32px 20px 64px;
-      }
-
+      .page { max-width: 880px; margin: 0 auto; padding: 32px 20px 64px; }
       .hero {
         background: linear-gradient(145deg, var(--primary) 0%, var(--primary-soft) 100%);
-        color: #ffffff;
-        border-radius: 28px;
-        padding: 28px 24px;
+        color: #ffffff; border-radius: 28px; padding: 28px 24px;
         box-shadow: 0 18px 40px rgba(12, 68, 124, 0.18);
       }
-
       .eyebrow {
-        display: inline-flex;
-        align-items: center;
-        border-radius: 999px;
-        padding: 8px 12px;
-        background: rgba(255, 255, 255, 0.16);
-        font-size: 13px;
-        font-weight: 700;
+        display: inline-flex; align-items: center; border-radius: 999px;
+        padding: 8px 12px; background: rgba(255, 255, 255, 0.16);
+        font-size: 13px; font-weight: 700;
       }
-
-      h1 {
-        margin: 16px 0 10px;
-        font-size: 34px;
-        line-height: 1.2;
-      }
-
+      h1 { margin: 16px 0 10px; font-size: 34px; line-height: 1.2; }
       .hero p {
-        margin: 0;
-        max-width: 640px;
-        font-size: 16px;
-        line-height: 1.7;
+        margin: 0; max-width: 640px; font-size: 16px; line-height: 1.7;
         color: rgba(255, 255, 255, 0.92);
       }
-
       .meta-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-        gap: 12px;
-        margin-top: 18px;
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 12px; margin-top: 18px;
       }
-
       .meta-card {
-        background: rgba(255, 255, 255, 0.12);
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        border-radius: 18px;
-        padding: 14px 16px;
+        background: rgba(255, 255, 255, 0.12); border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 18px; padding: 14px 16px;
       }
-
-      .meta-label {
-        margin: 0 0 6px;
-        font-size: 12px;
-        font-weight: 700;
-        color: rgba(255, 255, 255, 0.75);
-      }
-
-      .meta-value {
-        margin: 0;
-        font-size: 16px;
-        font-weight: 800;
-      }
-
-      .section-list {
-        display: grid;
-        gap: 16px;
-        margin-top: 18px;
-      }
-
+      .meta-label { margin: 0 0 6px; font-size: 12px; font-weight: 700; color: rgba(255, 255, 255, 0.75); }
+      .meta-value { margin: 0; font-size: 16px; font-weight: 800; }
+      .section-list { display: grid; gap: 16px; margin-top: 18px; }
       section {
-        background: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: 24px;
-        padding: 22px 20px;
-        box-shadow: 0 10px 22px rgba(16, 32, 51, 0.05);
+        background: var(--surface); border: 1px solid var(--border); border-radius: 24px;
+        padding: 22px 20px; box-shadow: 0 10px 22px rgba(16, 32, 51, 0.05);
       }
-
-      h2 {
-        margin: 0 0 12px;
-        font-size: 20px;
-        line-height: 1.35;
-      }
-
-      p,
-      li {
-        margin: 0;
-        font-size: 15px;
-        line-height: 1.8;
-        color: var(--text-muted);
-      }
-
-      p + p {
-        margin-top: 10px;
-      }
-
-      ul {
-        margin: 12px 0 0;
-        padding-left: 20px;
-      }
-
-      li + li {
-        margin-top: 8px;
-      }
-
+      h2 { margin: 0 0 12px; font-size: 20px; line-height: 1.35; }
+      p, li { margin: 0; font-size: 15px; line-height: 1.8; color: var(--text-muted); }
+      p + p { margin-top: 10px; }
+      ul { margin: 12px 0 0; padding-left: 20px; }
+      li + li { margin-top: 8px; }
       .highlight {
-        background: var(--surface-muted);
-        border: 1px solid var(--border);
-        border-radius: 18px;
-        padding: 14px 16px;
-        margin-top: 14px;
+        background: var(--surface-muted); border: 1px solid var(--border); border-radius: 18px;
+        padding: 14px 16px; margin-top: 14px;
       }
-
-      .contact {
-        color: var(--primary);
-        font-weight: 800;
-        word-break: break-all;
-      }
-
-      footer {
-        margin-top: 18px;
-        text-align: center;
-        font-size: 13px;
-        color: var(--text-muted);
-      }
-
+      .contact { color: var(--primary); font-weight: 800; word-break: break-all; }
+      footer { margin-top: 18px; text-align: center; font-size: 13px; color: var(--text-muted); }
       @media (max-width: 640px) {
-        .page {
-          padding: 20px 14px 40px;
-        }
-
-        .hero {
-          padding: 22px 18px;
-          border-radius: 24px;
-        }
-
-        h1 {
-          font-size: 28px;
-        }
-
-        section {
-          padding: 18px 16px;
-          border-radius: 20px;
-        }
+        .page { padding: 20px 14px 40px; }
+        .hero { padding: 22px 18px; border-radius: 24px; }
+        h1 { font-size: 28px; }
+        section { padding: 18px 16px; border-radius: 20px; }
       }
     </style>
   </head>
@@ -187,23 +85,23 @@
     <main class="page">
       <header class="hero">
         <div class="eyebrow">Privacy Policy</div>
-        <h1>공수로 (Gongsuro) 개인정보처리방침</h1>
+        <h1>공수로(Gongsuro) 개인정보처리방침</h1>
         <p>
-          공수로는 작업 기록과 정산 관리를 돕는 앱입니다. 입력한 데이터는 기본적으로 사용자 기기 내부에만
-          저장되며, 사용자가 직접 실행한 공유나 백업 기능 외에는 외부로 전송하지 않습니다.
+          공수로는 공수 기록과 정산 관리를 위한 현장 업무 앱입니다. 입력된 데이터는 기본적으로 사용자
+          기기 내부에만 저장되며, 사용자가 직접 실행한 백업 또는 공유 기능 외에는 외부로 전송되지 않습니다.
         </p>
         <div class="meta-grid">
           <div class="meta-card">
             <p class="meta-label">앱 이름</p>
-            <p class="meta-value">공수로 (Gongsuro)</p>
+            <p class="meta-value">공수로(Gongsuro)</p>
           </div>
           <div class="meta-card">
             <p class="meta-label">시행일</p>
-            <p class="meta-value">2026-03-23</p>
+            <p class="meta-value">2026-03-25</p>
           </div>
           <div class="meta-card">
             <p class="meta-label">문의처</p>
-            <p class="meta-value">gosuking@gmail.com</p>
+            <p class="meta-value">support@gongsuro.com</p>
           </div>
         </div>
       </header>
@@ -211,79 +109,55 @@
       <div class="section-list">
         <section>
           <h2>1. 수집 및 저장하는 정보</h2>
-          <p>공수로는 사용자가 직접 입력한 정보만 처리합니다.</p>
+          <p>공수로는 사용자가 앱에 직접 입력한 업무 데이터만 처리합니다.</p>
           <ul>
             <li>현장명, 작업 내용, 공수, 단가, 금액, 메모, 정산 상태</li>
-            <li>백업 및 복원에 사용되는 파일 정보</li>
-            <li>저녁 알림 설정 정보</li>
+            <li>백업 내보내기 및 복원에 사용하는 파일 정보</li>
           </ul>
           <div class="highlight">
-            <p>
-              공수로는 회원가입 정보, 연락처 목록, 위치 정보, 광고 식별자, 생체 정보와 같은 추가 개인정보를
-              수집하지 않습니다.
-            </p>
+            <p>공수로는 회원 정보, 연락처 목록, 위치 정보, 광고 식별자, 결제 정보 같은 개인정보를 수집하지 않습니다.</p>
           </div>
         </section>
 
         <section>
-          <h2>2. 이용 목적</h2>
-          <p>수집 또는 저장된 정보는 다음 목적에만 사용됩니다.</p>
+          <h2>2. 정보 이용 목적</h2>
+          <p>앱은 다음 목적에 한해서만 데이터를 사용합니다.</p>
           <ul>
-            <li>일일 작업 기록 저장 및 조회</li>
-            <li>기간별 정산 계산과 정산서 생성</li>
+            <li>일별 공수 기록 저장 및 조회</li>
+            <li>기간별 정산 계산과 정산 상태 관리</li>
             <li>백업 파일 내보내기, 가져오기, 복원</li>
-            <li>사용자가 켠 저녁 알림 예약</li>
           </ul>
         </section>
 
         <section>
-          <h2>3. 외부 전송 및 제3자 제공</h2>
-          <p>공수로는 입력 데이터를 운영 서버로 전송하지 않습니다.</p>
-          <p>
-            다만 아래 기능은 사용자가 직접 실행한 경우에만 선택한 위치나 앱으로 정보가 전달될 수 있습니다.
-          </p>
+          <h2>3. 외부 전송 및 공유</h2>
+          <p>공수로는 입력된 데이터를 운영 서버로 전송하지 않습니다.</p>
+          <p>다만 아래 기능은 사용자가 직접 실행할 때에만 파일이 기기 밖으로 전달될 수 있습니다.</p>
           <ul>
-            <li>백업 파일 저장 또는 공유</li>
+            <li>백업 파일 공유 또는 내보내기</li>
             <li>백업 파일 가져오기</li>
             <li>정산서 PDF 공유</li>
           </ul>
           <div class="highlight">
-            <p>
-              공수로는 이용자 정보를 판매하지 않으며, 광고 목적 또는 마케팅 목적으로 제3자에게 제공하지
-              않습니다.
-            </p>
+            <p>공수로는 데이터를 판매하지 않으며, 광고나 마케팅 목적으로 제3자에게 제공하지 않습니다.</p>
           </div>
         </section>
 
         <section>
-          <h2>4. 알림 기능</h2>
-          <p>
-            저녁 알림 기능을 켜면 알림 시간 설정과 로컬 예약 정보만 기기에 저장됩니다.
-          </p>
-          <p>
-            공수로는 원격 푸시 토큰을 수집하지 않으며, 서버를 통한 푸시 알림을 발송하지 않습니다.
-          </p>
+          <h2>4. 보관 및 삭제</h2>
+          <p>입력한 데이터는 사용자가 삭제하거나 앱을 제거하기 전까지 기기 내부에 저장됩니다.</p>
+          <p>사용자는 기록 삭제, 백업 교체, 앱 삭제를 통해 데이터를 직접 정리할 수 있습니다.</p>
         </section>
 
         <section>
-          <h2>5. 보관 및 삭제</h2>
-          <p>입력 데이터는 사용자가 직접 삭제하거나 앱을 제거할 때까지 기기에 남을 수 있습니다.</p>
-          <p>
-            사용자는 앱 내 기록 삭제, 백업 교체, 앱 삭제를 통해 데이터를 정리할 수 있습니다.
-          </p>
-        </section>
-
-        <section>
-          <h2>6. 개발자 및 문의처</h2>
-          <p>공수로는 개인 개발자가 운영합니다.</p>
-          <p>
-            개인정보처리방침 및 데이터 처리 관련 문의는 아래 이메일로 받을 수 있습니다.
-          </p>
-          <p class="contact">gosuking@gmail.com</p>
+          <h2>5. 문의처</h2>
+          <p>개인정보처리방침 또는 데이터 처리와 관련한 문의는 아래 이메일로 받을 수 있습니다.</p>
+          <p class="contact">support@gongsuro.com</p>
         </section>
       </div>
 
-      <footer>© 공수로 (Gongsuro)</footer>
+      <footer>© 공수로(Gongsuro)</footer>
     </main>
   </body>
 </html>
+
