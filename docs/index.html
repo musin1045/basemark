@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>공수로 | 현장 공수와 정산을 간단하게</title>
+    <meta
+      name="description"
+      content="공수로는 현장 공수 기록, 월별 정산, 백업과 복원을 간단하게 관리할 수 있는 앱입니다."
+    />
+    <link rel="canonical" href="https://gongsuro.com/" />
+    <style>
+      :root {
+        --bg: #f6f3ec;
+        --surface: rgba(255, 255, 255, 0.82);
+        --surface-strong: #ffffff;
+        --text: #172534;
+        --muted: #5f6b76;
+        --primary: #0c447c;
+        --line: rgba(12, 68, 124, 0.12);
+        --shadow: 0 20px 60px rgba(23, 37, 52, 0.12);
+        --radius-xl: 28px;
+        --radius-lg: 20px;
+        --max: 1120px;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(circle at top left, rgba(220, 108, 63, 0.18), transparent 32%),
+          radial-gradient(circle at top right, rgba(12, 68, 124, 0.18), transparent 28%),
+          linear-gradient(180deg, #fbf8f2 0%, var(--bg) 100%);
+      }
+      a { color: inherit; text-decoration: none; }
+      .shell { width: min(calc(100% - 32px), var(--max)); margin: 0 auto; }
+      .topbar { padding: 20px 0 10px; }
+      .topbar-inner { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+      .brand { display: inline-flex; align-items: center; gap: 12px; font-weight: 800; letter-spacing: -0.03em; }
+      .brand-badge {
+        width: 42px; height: 42px; border-radius: 14px; display: grid; place-items: center; color: #fff;
+        background: linear-gradient(135deg, var(--primary) 0%, #2a77bf 100%);
+        box-shadow: 0 12px 24px rgba(12, 68, 124, 0.22);
+      }
+      .brand-text { font-size: 1.08rem; }
+      .top-links { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+      .link-chip {
+        border: 1px solid var(--line); background: rgba(255, 255, 255, 0.62); border-radius: 999px;
+        padding: 10px 14px; color: var(--muted); font-size: 0.94rem;
+      }
+      .hero { padding: 28px 0 34px; }
+      .hero-grid { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 22px; align-items: stretch; }
+      .hero-copy, .hero-panel, .section-card, .info-card {
+        border: 1px solid var(--line); border-radius: var(--radius-xl); background: var(--surface);
+        backdrop-filter: blur(14px); box-shadow: var(--shadow);
+      }
+      .hero-copy { padding: 40px; }
+      .eyebrow { display: inline-flex; align-items: center; gap: 8px; margin-bottom: 18px; color: var(--primary); font-size: 0.92rem; font-weight: 700; }
+      h1 { margin: 0; font-size: clamp(2.2rem, 6vw, 4.2rem); line-height: 0.98; letter-spacing: -0.05em; }
+      .hero-copy p { margin: 22px 0 0; max-width: 640px; color: var(--muted); font-size: 1.06rem; line-height: 1.72; }
+      .cta-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 28px; }
+      .button {
+        display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 0 18px;
+        border-radius: 999px; font-weight: 700; font-size: 0.97rem;
+      }
+      .button-primary { color: #fff; background: linear-gradient(135deg, var(--primary) 0%, #2066a7 100%); }
+      .button-secondary { color: var(--primary); background: rgba(255, 255, 255, 0.82); border: 1px solid rgba(12, 68, 124, 0.14); }
+      .hero-panel { padding: 22px; display: grid; gap: 14px; }
+      .mini-panel { padding: 18px; border-radius: var(--radius-lg); background: var(--surface-strong); border: 1px solid rgba(12, 68, 124, 0.08); }
+      .mini-label { margin: 0 0 8px; color: var(--muted); font-size: 0.82rem; font-weight: 700; }
+      .mini-value { margin: 0; font-size: 1.6rem; font-weight: 800; letter-spacing: -0.04em; }
+      .mock-phone { position: relative; overflow: hidden; min-height: 360px; border-radius: 30px; background: linear-gradient(180deg, #113c66 0%, #0f2f4f 100%); color: #fff; padding: 18px; }
+      .mock-header { display: flex; align-items: center; justify-content: space-between; font-size: 0.92rem; opacity: 0.88; }
+      .mock-title { margin: 22px 0 18px; font-size: 1.3rem; font-weight: 800; }
+      .calendar { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+      .calendar-label, .calendar-cell { border-radius: 12px; text-align: center; }
+      .calendar-label { padding: 8px 0; color: rgba(255, 255, 255, 0.7); font-size: 0.74rem; }
+      .calendar-cell { min-height: 56px; padding-top: 9px; background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.08); font-size: 0.82rem; }
+      .calendar-cell strong { display: block; margin-top: 5px; font-size: 0.74rem; color: #ffd98d; }
+      .calendar-cell.off strong { color: rgba(255, 255, 255, 0.35); }
+      .section { padding: 14px 0; }
+      .section-card { padding: 28px; }
+      .section-heading { margin: 0 0 8px; font-size: 1.55rem; letter-spacing: -0.04em; }
+      .section-copy { margin: 0; color: var(--muted); line-height: 1.7; }
+      .feature-grid, .info-grid { margin-top: 20px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+      .feature { padding: 18px; border-radius: var(--radius-lg); background: rgba(255, 255, 255, 0.78); border: 1px solid rgba(12, 68, 124, 0.08); }
+      .feature strong { display: block; margin-bottom: 8px; font-size: 1rem; }
+      .feature p { margin: 0; color: var(--muted); line-height: 1.62; }
+      .info-card { padding: 22px; }
+      .info-card h3 { margin: 0 0 10px; font-size: 1.05rem; }
+      .info-card p, .info-card li { color: var(--muted); line-height: 1.7; }
+      .info-card ul { margin: 0; padding-left: 18px; }
+      .footer { padding: 22px 0 42px; }
+      .footer-inner { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; color: var(--muted); font-size: 0.93rem; }
+      .footer-links { display: flex; gap: 14px; flex-wrap: wrap; }
+      @media (max-width: 920px) {
+        .hero-grid, .feature-grid, .info-grid { grid-template-columns: 1fr; }
+        .hero-copy { padding: 28px; }
+      }
+      @media (max-width: 640px) {
+        .shell { width: min(calc(100% - 20px), var(--max)); }
+        .topbar-inner, .footer-inner { align-items: flex-start; flex-direction: column; }
+        .hero { padding-top: 18px; }
+        .hero-copy, .hero-panel, .section-card, .info-card { border-radius: 24px; }
+        .hero-copy, .section-card, .info-card { padding: 22px; }
+        h1 { font-size: 2.4rem; }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="shell topbar-inner">
+        <a class="brand" href="/">
+          <span class="brand-badge">공</span>
+          <span class="brand-text">공수로</span>
+        </a>
+        <nav class="top-links">
+          <a class="link-chip" href="#features">기능</a>
+          <a class="link-chip" href="#support">문의</a>
+          <a class="link-chip" href="./privacy.html">개인정보처리방침</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="shell hero-grid">
+          <div class="hero-copy">
+            <div class="eyebrow">현장 공수 관리 앱</div>
+            <h1>공수 관리와 정산, 기록을 간단하게</h1>
+            <p>
+              공수로는 현장별 공수 기록, 월별 정산 확인, 백업과 복원을 빠르게 처리할 수 있는 앱입니다.
+              복잡한 화면보다 매일 바로 여는 흐름에 집중했습니다.
+            </p>
+            <div class="cta-row">
+              <a class="button button-primary" href="mailto:support@gongsuro.com">문의하기</a>
+              <a class="button button-secondary" href="./privacy.html">개인정보처리방침</a>
+            </div>
+          </div>
+
+          <div class="hero-panel">
+            <div class="mini-panel">
+              <p class="mini-label">핵심 사용 흐름</p>
+              <p class="mini-value">기록 · 정산 · 백업</p>
+            </div>
+            <div class="mock-phone" aria-label="공수로 예시 화면">
+              <div class="mock-header">
+                <span>공수로</span>
+                <span>4월 정산</span>
+              </div>
+              <div class="mock-title">월별 공수 현황</div>
+              <div class="calendar">
+                <div class="calendar-label">일</div>
+                <div class="calendar-label">월</div>
+                <div class="calendar-label">화</div>
+                <div class="calendar-label">수</div>
+                <div class="calendar-label">목</div>
+                <div class="calendar-label">금</div>
+                <div class="calendar-label">토</div>
+
+                <div class="calendar-cell off">6<strong>휴무</strong></div>
+                <div class="calendar-cell">7<strong>성수 2공수</strong></div>
+                <div class="calendar-cell">8<strong>광교 2공수</strong></div>
+                <div class="calendar-cell">9<strong>분당 1공수</strong></div>
+                <div class="calendar-cell">10<strong>마포 2공수</strong></div>
+                <div class="calendar-cell">11<strong>성수 1.5공수</strong></div>
+                <div class="calendar-cell">12<strong>광교 1공수</strong></div>
+
+                <div class="calendar-cell off">13<strong>휴무</strong></div>
+                <div class="calendar-cell">14<strong>성수 2공수</strong></div>
+                <div class="calendar-cell">15<strong>분당 2공수</strong></div>
+                <div class="calendar-cell">16<strong>마포 1공수</strong></div>
+                <div class="calendar-cell">17<strong>광교 2공수</strong></div>
+                <div class="calendar-cell">18<strong>성수 2공수</strong></div>
+                <div class="calendar-cell">19<strong>분당 1공수</strong></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="features">
+        <div class="shell">
+          <div class="section-card">
+            <h2 class="section-heading">매일 여는 기능만 담았습니다</h2>
+            <p class="section-copy">
+              기록을 남기고, 월별로 모아 보고, 필요할 때 정산하고 백업하는 흐름이 자연스럽게 이어지도록 구성했습니다.
+            </p>
+            <div class="feature-grid">
+              <article class="feature">
+                <strong>현장별 공수 기록</strong>
+                <p>현장명, 공수, 단가, 메모를 빠르게 입력하고 날짜별로 바로 확인할 수 있습니다.</p>
+              </article>
+              <article class="feature">
+                <strong>월별 정산 확인</strong>
+                <p>선택한 기간의 총액과 미정산 금액을 한 번에 보고 정산 완료 상태를 관리합니다.</p>
+              </article>
+              <article class="feature">
+                <strong>백업과 복원</strong>
+                <p>기록을 파일로 내보내고 다시 가져와 기기 변경이나 초기화 상황에도 대비할 수 있습니다.</p>
+              </article>
+              <article class="feature">
+                <strong>PDF 정산서 내보내기</strong>
+                <p>정산 내용을 PDF로 만들어 공유하거나 보관용으로 정리해 전달할 수 있습니다.</p>
+              </article>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="support">
+        <div class="shell info-grid">
+          <article class="info-card">
+            <h3>공식 안내</h3>
+            <p>
+              공수로는 현장 업무 기록과 정산 정리를 더 단순하게 만들기 위해 운영되는 앱입니다.
+              현재 문의와 운영 관련 안내는 이메일로 받고 있습니다.
+            </p>
+          </article>
+          <article class="info-card">
+            <h3>문의 및 정책</h3>
+            <ul>
+              <li>문의 이메일: <a href="mailto:support@gongsuro.com">support@gongsuro.com</a></li>
+              <li>개인정보처리방침: <a href="./privacy.html">privacy.html</a></li>
+              <li>공식 홈페이지: <a href="https://gongsuro.com/">gongsuro.com</a></li>
+            </ul>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="shell footer-inner">
+        <div>© 2026 공수로. 현장 공수와 정산을 간단하게.</div>
+        <div class="footer-links">
+          <a href="./privacy.html">개인정보처리방침</a>
+          <a href="mailto:support@gongsuro.com">문의하기</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>
